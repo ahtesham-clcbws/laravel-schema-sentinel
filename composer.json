@@ -1,0 +1,53 @@
+{
+    "name": "clcbws/laravel-schema-sentinel",
+    "description": "Detect and fix database schema drift in Laravel by comparing migrations with the live database state.",
+    "version": "1.0.0-alpha",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ahtesham",
+            "email": "ahtesham@clcbws.com",
+            "homepage": "https://www.clcbws.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^13.0|^12.0|^11.0",
+        "illuminate/database": "^13.0|^12.0|^11.0",
+        "illuminate/console": "^13.0|^12.0|^11.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0|^11.0",
+        "orchestra/testbench": "^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Sentinel\\SchemaSentinel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Sentinel\\SchemaSentinel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Sentinel\\SchemaSentinel\\SentinelServiceProvider"
+            ],
+            "aliases": {
+                "Sentinel": "Sentinel\\SchemaSentinel\\Facades\\Sentinel"
+            }
+        }
+    },
+    "keywords": [
+        "laravel",
+        "database",
+        "schema",
+        "drift",
+        "migration",
+        "sentinel",
+        "clcbws"
+    ]
+}
