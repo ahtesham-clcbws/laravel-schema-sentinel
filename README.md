@@ -1,8 +1,8 @@
 # Laravel Schema Sentinel
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/clcbws/laravel-schema-sentinel.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
+[![Latest Version on GitHub](https://img.shields.io/github/v/release/ahtesham-clcbws/laravel-schema-sentinel?include_prereleases&style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/releases)
 [![Total Downloads](https://img.shields.io/packagist/dt/clcbws/laravel-schema-sentinel.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
-[![License](https://img.shields.io/packagist/l/clcbws/laravel-schema-sentinel.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
+[![License](https://img.shields.io/github/license/ahtesham-clcbws/laravel-schema-sentinel?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/blob/main/LICENSE)
 
 **Laravel Schema Sentinel** is a premium database integrity tool designed to detect and resolve "Schema Drift"—the discrepancies between your migration files and your actual live database. Fully optimized for **Laravel 13.x**, with legacy support for 12.x and 11.x.
 
