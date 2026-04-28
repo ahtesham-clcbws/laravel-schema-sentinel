@@ -14,7 +14,9 @@
 - 🚀 **Virtual Migration Engine**: Safely simulates your entire migration history in a shadow SQLite database.
 - 🛠️ **Automated Fixer**: Generates bi-directional migrations (`up()` and `down()`) to bridge gaps while maintaining rollbacks.
 - 🔍 **Strict Mode**: Identifies "unauthorized" DB changes or legacy artifacts not tracked in your code.
-- 🧙 **Interactive Wizard**: Prompts you for confirmation before including specific fixes in generated migrations.
+- 🧙 **Interactive Auto-Fix**: Automatically detects failing migrations and offers to add them to your skip list with a single `[y/n]` confirmation.
+- 🛡️ **Total Isolation**: Redirection engine that prevents even hardcoded migration connections (like Laravel Passport) from leaking into your live database.
+- ⏭️ **Migration Skipping**: Bypass problematic, legacy, or SQLite-incompatible migrations using the `skip_migrations` configuration.
 - 🤖 **CI/CD Ready**: Returns standard exit codes (0 for sync, 1 for drift) for automated pipeline enforcement.
 - 🧩 **UI Friendly**: Programmatic API via the `Sentinel` Facade for integration with custom admin panels or Livewire.
 
@@ -76,6 +78,20 @@ The config file allows you to:
 - Define **Ignored Tables** (e.g., third-party package tables).
 - Add **Custom Migration Paths** for modular apps.
 - Configure the **Shadow Connection** settings.
+- **Skip Migrations** that are broken or incompatible with SQLite.
+
+---
+
+## 🛠️ Troubleshooting
+
+### Shadow Migration Failures
+If `php artisan schema:drift` fails during the simulation step, it usually means your `database/migrations` folder is incomplete or has SQLite incompatibilities.
+
+1. **Missing Tables**: If a migration tries to `Schema::table()` a table that wasn't created in an earlier migration, the simulation will fail.
+2. **Interactive Skip**: Sentinel will identify the failing file and ask: `Would you like me to add it for you automatically?`. Typing `y` will add it to your `skip_migrations` config.
+3. **MySQL Shadow**: If your migrations use MySQL-specific features (spatial types, complex alters), change the `shadow_connection` driver to `mysql` in `config/schema-sentinel.php` to use a real MySQL database for simulation.
+
+---
 
 ### 2. UI Integration (Controllers, Livewire, Blade)
 
