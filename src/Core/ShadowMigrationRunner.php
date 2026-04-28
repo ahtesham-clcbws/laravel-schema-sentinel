@@ -41,13 +41,18 @@ class ShadowMigrationRunner
             DB::setDefaultConnection(self::CONNECTION_NAME);
             
             $paths = Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
+            $skipMigrations = Config::get('schema-sentinel.skip_migrations', []);
 
             foreach ($paths as $path) {
+                $runPath = $this->prepareMigrationPath($path, $skipMigrations);
+                
                 Artisan::call('migrate', [
                     '--database' => self::CONNECTION_NAME,
-                    '--path' => $path,
+                    '--path' => $runPath,
                     '--force' => true,
                 ]);
+
+                $this->cleanupTemporaryPath($runPath);
             }
         } finally {
             // Restore original connection configurations
@@ -74,6 +79,54 @@ class ShadowMigrationRunner
         Config::set('database.connections.' . self::CONNECTION_NAME, $config);
 
         DB::purge(self::CONNECTION_NAME);
+    }
+
+    /**
+     * Prepare a temporary migration path to handle skipped migrations.
+     */
+    protected function prepareMigrationPath(string $originalPath, array $skipMigrations): string
+    {
+        $absolutePath = base_path($originalPath);
+        
+        if (!is_dir($absolutePath)) {
+            return $originalPath; // Fallback to original if not a directory
+        }
+
+        if (empty($skipMigrations)) {
+            return $originalPath;
+        }
+
+        $tempPath = storage_path('framework/sentinel_migrations_' . uniqid());
+        if (!is_dir($tempPath)) {
+            mkdir($tempPath, 0755, true);
+        }
+
+        $files = scandir($absolutePath);
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') continue;
+            
+            if (in_array($file, $skipMigrations)) {
+                continue; // Skip this migration
+            }
+
+            copy($absolutePath . '/' . $file, $tempPath . '/' . $file);
+        }
+
+        return $tempPath;
+    }
+
+    /**
+     * Cleanup the temporary migration path.
+     */
+    protected function cleanupTemporaryPath(string $path): void
+    {
+        if (str_contains($path, 'sentinel_migrations_') && is_dir($path)) {
+            $files = array_diff(scandir($path), ['.', '..']);
+            foreach ($files as $file) {
+                unlink($path . '/' . $file);
+            }
+            rmdir($path);
+        }
     }
 
     public function cleanup(): void

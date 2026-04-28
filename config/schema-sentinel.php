@@ -65,4 +65,18 @@ return [
         'strict' => false,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Skip Migrations
+    |--------------------------------------------------------------------------
+    |
+    | If some of your older migrations are broken or incompatible with SQLite,
+    | you can list their filenames here to skip them during the simulation.
+    | Use the full filename (e.g., '2023_01_01_000000_create_users_table.php').
+    |
+    */
+    'skip_migrations' => [
+        // '2023_04_21_113217_update_test_table_column.php',
+    ],
+
 ];
