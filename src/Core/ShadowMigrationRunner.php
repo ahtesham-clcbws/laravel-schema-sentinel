@@ -25,8 +25,10 @@ class ShadowMigrationRunner
         
         try {
             // Force the default connection to be our shadow connection
-            // This ensures Schema and DB facades use the shadow DB by default
+            // We use both Config and DB::setDefaultConnection for maximum compatibility
             Config::set('database.default', self::CONNECTION_NAME);
+            DB::setDefaultConnection(self::CONNECTION_NAME);
+            DB::purge(self::CONNECTION_NAME); // Ensure fresh state
             
             $paths = Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
 
@@ -39,6 +41,7 @@ class ShadowMigrationRunner
             }
         } finally {
             Config::set('database.default', $originalDefault);
+            DB::setDefaultConnection($originalDefault);
         }
 
         return DB::connection(self::CONNECTION_NAME);
