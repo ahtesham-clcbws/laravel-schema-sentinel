@@ -45,7 +45,22 @@ class DriftCommand extends Command
 
         // 1. Simulate migrations
         $this->components->task('Simulating migrations on Shadow DB', function () use ($shadowRunner, &$shadowConn) {
-            $shadowConn = $shadowRunner->run();
+            try {
+                $shadowConn = $shadowRunner->run();
+            } catch (\Exception $e) {
+                $this->newLine();
+                $this->components->error('Shadow migration simulation failed!');
+                $this->line("  <fg=red>Error:</> " . $e->getMessage());
+                $this->newLine();
+                $this->line('  <fg=yellow>Common Causes & Solutions:</>');
+                $this->line('  • <fg=white>Missing Table:</> A migration is trying to modify a table that was never created in earlier migrations.');
+                $this->line('  • <fg=white>SQLite Incompatibility:</> Your migrations use MySQL-specific features (like spatial types or complex alters).');
+                $this->line('    <fg=gray>Solution: Change "shadow_connection" to a MySQL driver in config/schema-sentinel.php</>');
+                $this->line('  • <fg=white>Syntax Error:</> Check the file mentioned in the stack trace below.');
+                $this->newLine();
+                
+                throw $e;
+            }
         });
 
         // 2. Parse schemas

@@ -1,7 +1,7 @@
 {
     "name": "clcbws/laravel-schema-sentinel",
     "description": "Detect and fix database schema drift in Laravel by comparing migrations with the live database state.",
-    "version": "1.1.2",
+    "version": "1.1.3",
     "type": "library",
     "license": "MIT",
     "authors": [
