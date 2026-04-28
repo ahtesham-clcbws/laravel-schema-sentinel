@@ -65,6 +65,12 @@ class DriftCommand extends Command
             if ($failingFile) {
                 $this->line("  <fg=white>1. Skip the failing migration:</>");
                 $this->line("     Add <fg=cyan>'{$failingFile}'</> to the <fg=green>'skip_migrations'</> array in <fg=gray>config/schema-sentinel.php</>");
+                
+                if ($this->confirm("Would you like me to add it for you automatically?")) {
+                    $this->autoSkipMigration($failingFile);
+                    $this->components->info("Migration added to skip list. Please run schema:drift again.");
+                    return 1;
+                }
                 $this->newLine();
             }
 
@@ -181,6 +187,34 @@ class DriftCommand extends Command
             }
         }
         
-        $this->newLine();
+    }
+
+    /**
+     * Automatically add a migration filename to the skip_migrations array in the config file.
+     */
+    protected function autoSkipMigration(string $filename): void
+    {
+        $path = \Illuminate\Support\Facades\App::configPath('schema-sentinel.php');
+        
+        if (!file_exists($path)) {
+            // Fallback to local config if not published (unlikely in production usage)
+            return;
+        }
+
+        $content = file_get_contents($path);
+        
+        if (str_contains($content, "'{$filename}'") || str_contains($content, "\"{$filename}\"")) {
+            return; // Already skipped
+        }
+
+        // Regex to find the skip_migrations array and append the new file
+        $pattern = "/(['\"]skip_migrations['\"]\s*=>\s*\[)/";
+        $replacement = "$1\n        '{$filename}',";
+        
+        $newContent = preg_replace($pattern, $replacement, $content);
+        
+        if ($newContent !== $content) {
+            file_put_contents($path, $newContent);
+        }
     }
 }
