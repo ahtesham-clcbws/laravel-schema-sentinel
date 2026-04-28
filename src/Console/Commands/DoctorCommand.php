@@ -23,6 +23,7 @@ class DoctorCommand extends Command
             'PDO SQLite Extension' => extension_loaded('pdo_sqlite'),
             'Config File' => file_exists(\Illuminate\Support\Facades\App::configPath('schema-sentinel.php')) || file_exists(__DIR__.'/../../../config/schema-sentinel.php'),
             'Database Connection' => $this->checkConnection(),
+            'Shadow Database' => $this->checkShadowConnection(),
         ];
 
         $failed = 0;
@@ -51,6 +52,26 @@ class DoctorCommand extends Command
     {
         try {
             DB::connection()->getPdo();
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    protected function checkShadowConnection(): bool
+    {
+        try {
+            $config = Config::get('schema-sentinel.shadow_connection', [
+                'driver'   => 'sqlite',
+                'database' => ':memory:',
+                'prefix'   => '',
+                'foreign_key_constraints' => false,
+            ]);
+
+            Config::set('database.connections.sentinel_doctor_test', $config);
+            DB::connection('sentinel_doctor_test')->getPdo();
+            DB::disconnect('sentinel_doctor_test');
+            
             return true;
         } catch (\Exception $e) {
             return false;

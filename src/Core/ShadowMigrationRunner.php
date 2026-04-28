@@ -21,14 +21,24 @@ class ShadowMigrationRunner
     {
         $this->setupShadowConnection();
 
-        $paths = \Illuminate\Support\Facades\Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
+        $originalDefault = Config::get('database.default');
+        
+        try {
+            // Force the default connection to be our shadow connection
+            // This ensures Schema and DB facades use the shadow DB by default
+            Config::set('database.default', self::CONNECTION_NAME);
+            
+            $paths = Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
 
-        foreach ($paths as $path) {
-            Artisan::call('migrate', [
-                '--database' => self::CONNECTION_NAME,
-                '--path' => $path,
-                '--force' => true,
-            ]);
+            foreach ($paths as $path) {
+                Artisan::call('migrate', [
+                    '--database' => self::CONNECTION_NAME,
+                    '--path' => $path,
+                    '--force' => true,
+                ]);
+            }
+        } finally {
+            Config::set('database.default', $originalDefault);
         }
 
         return DB::connection(self::CONNECTION_NAME);
@@ -36,7 +46,7 @@ class ShadowMigrationRunner
 
     protected function setupShadowConnection(): void
     {
-        $config = \Illuminate\Support\Facades\Config::get('schema-sentinel.shadow_connection', [
+        $config = Config::get('schema-sentinel.shadow_connection', [
             'driver'   => 'sqlite',
             'database' => ':memory:',
             'prefix'   => '',
