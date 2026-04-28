@@ -37,6 +37,11 @@ class DriftCommand extends Command
         DiffEngine $diffEngine,
         MigrationGenerator $generator
     ): int {
+        if (app()->environment('production') && $this->option('fix') && !$this->confirm('You are in PRODUCTION. Are you sure you want to generate a drift-fix migration?')) {
+            $this->components->error('Operation cancelled for safety.');
+            return 1;
+        }
+
         $this->components->info('Starting Schema Drift Analysis...');
 
         while (true) {
