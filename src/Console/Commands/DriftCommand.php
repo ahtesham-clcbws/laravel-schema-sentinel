@@ -52,12 +52,25 @@ class DriftCommand extends Command
             $this->newLine();
             $this->components->error('Shadow migration simulation failed!');
             $this->line("  <fg=red>Error:</> " . $e->getMessage());
+            
+            // Try to extract the failing migration filename from the stack trace
+            $failingFile = null;
+            if (preg_match('/database\/migrations\/([^\s:]+\.php)/', $e->getTraceAsString(), $matches)) {
+                $failingFile = $matches[1];
+            }
+
             $this->newLine();
-            $this->line('  <fg=yellow>Common Causes & Solutions:</>');
-            $this->line('  • <fg=white>Missing Table:</> A migration is trying to modify a table that was never created in earlier migrations.');
-            $this->line('  • <fg=white>SQLite Incompatibility:</> Your migrations use MySQL-specific features (like spatial types or complex alters).');
+            $this->components->warn('Potential Solutions:');
+            
+            if ($failingFile) {
+                $this->line("  <fg=white>1. Skip the failing migration:</>");
+                $this->line("     Add <fg=cyan>'{$failingFile}'</> to the <fg=green>'skip_migrations'</> array in <fg=gray>config/schema-sentinel.php</>");
+                $this->newLine();
+            }
+
+            $this->line('  <fg=white>' . ($failingFile ? '2' : '1') . '. Check for Missing Tables:</> This migration might be trying to modify a table that was never created.');
+            $this->line('  <fg=white>' . ($failingFile ? '3' : '2') . '. SQLite Incompatibility:</> Your migrations might use MySQL-specific features.');
             $this->line('    <fg=gray>Solution: Change "shadow_connection" to a MySQL driver in config/schema-sentinel.php</>');
-            $this->line('  • <fg=white>Syntax Error:</> Check the file mentioned in the stack trace below.');
             $this->newLine();
             
             return 1;
