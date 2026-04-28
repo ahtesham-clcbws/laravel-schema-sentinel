@@ -11,13 +11,13 @@
 ## ✨ Key Features
 
 - 🛡️ **Deep Drift Detection**: Audits Tables, Columns, Types, Nullability, Defaults, Indexes, and Foreign Keys.
-- 🚀 **Virtual Migration Engine**: Safely simulates your entire migration history in a shadow SQLite database.
-- 🛠️ **Automated Fixer**: Generates bi-directional migrations (`up()` and `down()`) to bridge gaps while maintaining rollbacks.
-- 🔍 **Strict Mode**: Identifies "unauthorized" DB changes or legacy artifacts not tracked in your code.
-- 🧙 **Interactive Auto-Fix**: Automatically detects failing migrations and offers to add them to your skip list with a single `[y/n]` confirmation.
-- 🛡️ **Total Isolation**: Redirection engine that prevents even hardcoded migration connections (like Laravel Passport) from leaking into your live database.
-- ⏭️ **Migration Skipping**: Bypass problematic, legacy, or SQLite-incompatible migrations using the `skip_migrations` configuration.
-- 🤖 **CI/CD Ready**: Returns standard exit codes (0 for sync, 1 for drift) for automated pipeline enforcement.
+- 🧙 **Interactive Auto-Fix**: Automatically detects failing migrations and offers to add them to your skip list.
+- 📸 **Schema Snapshotting**: Save your ideal schema to JSON to speed up audits by skipping migration simulations.
+- 🧪 **Dry-Run Mode**: Use `--sql` to preview the migration code in your terminal without creating a file.
+- 📐 **Index Normalization**: Automatically matches indexes by column and type, ignoring naming discrepancies.
+- 📊 **Visual Dashboard**: A built-in Livewire component for real-time health monitoring (Local environment only).
+- 🛡️ **Total Isolation**: Redirection engine that prevents even hardcoded connections from leaking into your live DB.
+- 🤖 **CI/CD Ready**: Returns standard exit codes for automated pipeline enforcement.
 - 🧩 **UI Friendly**: Programmatic API via the `Sentinel` Facade for integration with custom admin panels or Livewire.
 
 ---
@@ -50,6 +50,23 @@ php artisan schema:drift
 To verify your environment is ready for Sentinel:
 ```bash
 php artisan schema:sentinel-doctor
+```
+
+#### Create a Schema Snapshot
+To freeze your current ideal schema for faster future audits:
+```bash
+php artisan schema:snapshot
+```
+
+#### Use a Snapshot for Drift Check
+```bash
+php artisan schema:drift --snapshot=latest
+```
+
+#### Dry-Run (SQL Preview)
+To see the migration code without creating any files:
+```bash
+php artisan schema:drift --sql
 ```
 
 #### Fix Drift Interactively

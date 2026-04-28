@@ -60,10 +60,23 @@ class DiffEngine
                     }
                 }
 
-                // 2. Index Analysis
-                $missingIdx = array_diff_key($idealTable->indexes, $liveTable->indexes);
-                foreach ($missingIdx as $idxName => $idx) {
-                    $missingIndexes["$tableName.$idxName"] = ['table' => $tableName, 'index' => $idx];
+                // 2. Index Analysis (with Normalization)
+                foreach ($idealTable->indexes as $idealIdxName => $idealIdx) {
+                    $foundMatch = false;
+                    foreach ($liveTable->indexes as $liveIdxName => $liveIdx) {
+                        // Check if columns and type match (Normalization)
+                        if ($idealIdx->columns == $liveIdx->columns && $idealIdx->type == $liveIdx->type) {
+                            $foundMatch = true;
+                            
+                            // If names are different, we could report it, but for now we treat as match
+                            // to avoid redundant index creation.
+                            break;
+                        }
+                    }
+                    
+                    if (!$foundMatch) {
+                        $missingIndexes["$tableName.$idealIdxName"] = ['table' => $tableName, 'index' => $idealIdx];
+                    }
                 }
 
                 // 3. Foreign Key Analysis

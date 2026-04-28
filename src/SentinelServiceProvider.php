@@ -5,6 +5,7 @@ namespace Sentinel\SchemaSentinel;
 use Illuminate\Support\ServiceProvider;
 use Sentinel\SchemaSentinel\Console\Commands\DriftCommand;
 use Sentinel\SchemaSentinel\Console\Commands\DoctorCommand;
+use Sentinel\SchemaSentinel\Console\Commands\SnapshotCommand;
 use Illuminate\Support\Facades\App;
 
 class SentinelServiceProvider extends ServiceProvider
@@ -30,6 +31,7 @@ class SentinelServiceProvider extends ServiceProvider
             $this->commands([
                 DriftCommand::class,
                 DoctorCommand::class,
+                SnapshotCommand::class,
             ]);
         }
     }

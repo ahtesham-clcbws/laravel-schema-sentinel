@@ -27,7 +27,7 @@ class MigrationGenerator
         $fileName = date('Y_m_d_His') . '_' . $name . '.php';
         $path = App::databasePath('migrations/' . $fileName);
 
-        $content = $this->buildMigrationContent($diff, $interactive);
+        $content = $this->buildMigrationCode($diff, $interactive);
 
         File::put($path, $content);
 
@@ -37,7 +37,7 @@ class MigrationGenerator
     /**
      * Assemble the migration file content.
      */
-    protected function buildMigrationContent(SchemaDiff $diff, bool $interactive): string
+    public function buildMigrationCode(SchemaDiff $diff, bool $interactive): string
     {
         $up = [];
         $down = [];

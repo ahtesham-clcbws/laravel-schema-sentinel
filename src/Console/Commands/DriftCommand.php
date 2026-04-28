@@ -20,6 +20,8 @@ class DriftCommand extends Command
      */
     protected $signature = 'schema:drift 
                             {--fix : Generate a new migration to fix the drift}
+                            {--sql : Display the SQL that would be executed to fix drift (Dry Run)}
+                            {--snapshot= : Use a specific schema snapshot file instead of simulating migrations}
                             {--strict : Report extra tables and columns in the live DB}
                             {--interactive : Confirm each fix step-by-step}';
     
@@ -35,7 +37,8 @@ class DriftCommand extends Command
         ShadowMigrationRunner $shadowRunner,
         SchemaParser $parser,
         DiffEngine $diffEngine,
-        MigrationGenerator $generator
+        MigrationGenerator $generator,
+        \Sentinel\SchemaSentinel\Core\SnapshotManager $snapshotManager
     ): int {
         if (app()->environment('production') && $this->option('fix') && !$this->confirm('You are in PRODUCTION. Are you sure you want to generate a drift-fix migration?')) {
             $this->components->error('Operation cancelled for safety.');
@@ -49,12 +52,18 @@ class DriftCommand extends Command
             $liveSchema = [];
             $idealSchema = [];
 
-            // 1. Simulate migrations
-            try {
-                $this->components->task('Simulating migrations on Shadow DB', function () use ($shadowRunner, &$shadowConn) {
-                    $shadowConn = $shadowRunner->run();
+            // 1. Obtain Ideal Schema
+            if ($snapshotName = $this->option('snapshot')) {
+                $this->components->task("Loading ideal schema from snapshot [{$snapshotName}]", function () use ($snapshotManager, $snapshotName, &$idealSchema) {
+                    $idealSchema = $snapshotManager->load($snapshotName);
                 });
-            } catch (\Exception $e) {
+            } else {
+                // Simulate migrations if no snapshot provided
+                try {
+                    $this->components->task('Simulating migrations on Shadow DB', function () use ($shadowRunner, &$shadowConn) {
+                        $shadowConn = $shadowRunner->run();
+                    });
+                } catch (\Exception $e) {
                 $this->newLine();
                 $this->components->error('Shadow migration simulation failed!');
                 $this->line("  <fg=red>Error:</> " . $e->getMessage());
@@ -97,11 +106,15 @@ class DriftCommand extends Command
 
             // 2. Parse schemas
             $this->components->task('Parsing schemas', function () use ($parser, $shadowConn, &$liveSchema, &$idealSchema) {
-                if (!$shadowConn instanceof \Illuminate\Database\Connection) {
-                    throw new \RuntimeException('Shadow connection failed to initialize.');
-                }
                 $liveSchema = $parser->parse(DB::connection());
-                $idealSchema = $parser->parse($shadowConn);
+                
+                // Only parse ideal if we didn't load it from a snapshot
+                if (empty($idealSchema)) {
+                    if (!$shadowConn instanceof \Illuminate\Database\Connection) {
+                        throw new \RuntimeException('Shadow connection failed to initialize.');
+                    }
+                    $idealSchema = $parser->parse($shadowConn);
+                }
             });
 
             // 3. Diff Analysis
@@ -114,6 +127,16 @@ class DriftCommand extends Command
             $shadowRunner->cleanup();
 
             if ($diff->hasDifferences()) {
+                if ($this->option('sql')) {
+                    $this->newLine();
+                    $this->components->info('Dry Run: Generated Migration Code');
+                    $code = $generator->buildMigrationCode($diff, $this->option('interactive'));
+                    $this->line("\n<fg=gray>/* --- Generated Migration --- */</>");
+                    $this->line("<fg=green>{$code}</>");
+                    $this->newLine();
+                    return 0;
+                }
+
                 if ($this->option('fix')) {
                     $path = $generator->generate($diff, $this->option('interactive'));
                     $this->components->info("Migration generated: " . basename($path));

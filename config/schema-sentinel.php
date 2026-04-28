@@ -79,4 +79,18 @@ return [
         // '2023_04_21_113217_update_test_table_column.php',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Data Consistency Audit
+    |--------------------------------------------------------------------------
+    |
+    | List tables whose data should also be audited for consistency.
+    | Useful for reference tables like roles, permissions, or settings.
+    |
+    */
+    'data_audit_tables' => [
+        // 'roles',
+        // 'settings',
+    ],
+
 ];
