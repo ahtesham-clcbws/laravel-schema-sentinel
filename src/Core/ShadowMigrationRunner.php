@@ -21,14 +21,24 @@ class ShadowMigrationRunner
     {
         $this->setupShadowConnection();
 
+        $shadowConfig = Config::get('database.connections.' . self::CONNECTION_NAME);
+        $originalConnections = Config::get('database.connections');
         $originalDefault = Config::get('database.default');
-        
+
         try {
-            // Force the default connection to be our shadow connection
-            // We use both Config and DB::setDefaultConnection for maximum compatibility
+            // Total Isolation: Redirect ALL configured connections to the shadow DB.
+            // This prevents migrations that hardcode a connection (like Passport) 
+            // from accidentally hitting the live database.
+            foreach (array_keys($originalConnections) as $name) {
+                if ($name === self::CONNECTION_NAME) {
+                    continue;
+                }
+                Config::set("database.connections.{$name}", $shadowConfig);
+                DB::purge($name);
+            }
+
             Config::set('database.default', self::CONNECTION_NAME);
             DB::setDefaultConnection(self::CONNECTION_NAME);
-            DB::purge(self::CONNECTION_NAME); // Ensure fresh state
             
             $paths = Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
 
@@ -40,6 +50,11 @@ class ShadowMigrationRunner
                 ]);
             }
         } finally {
+            // Restore original connection configurations
+            foreach ($originalConnections as $name => $config) {
+                Config::set("database.connections.{$name}", $config);
+                DB::purge($name);
+            }
             Config::set('database.default', $originalDefault);
             DB::setDefaultConnection($originalDefault);
         }
