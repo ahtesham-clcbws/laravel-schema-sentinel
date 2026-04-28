@@ -11,14 +11,25 @@
 ## ✨ Key Features
 
 - 🛡️ **Deep Drift Detection**: Audits Tables, Columns, Types, Nullability, Defaults, Indexes, and Foreign Keys.
+- 🐢 **Slow Migration Detector**: Identifies migrations that take too long to run, preventing production downtime.
+- 📄 **Auto-Documentation**: Generate comprehensive Markdown documentation (`DATABASE.md`) of your entire schema.
+- 🔄 **Rollback Audit**: Verify that your migrations can be rolled back safely without breaking the DB schema.
+- 🌍 **Cross-Environment Sync**: Compare your local schema against Staging or Production directly.
+- 📉 **Squash Advisor**: Detects bloated migration folders and suggests optimizations to speed up your workflow.
+- 💯 **Schema Health Score**: Get a quantifiable percentage (0-100%) of your database integrity.
+- 🚦 **Pre-Migration Guard**: Automatically block `php artisan migrate` if drift is detected.
+- 🏷️ **Tagged Auditing**: Group migrations by tags and audit specific modules using the `--tag` option.
+- 🧹 **Migration Linter**: Audit your migration files for anti-patterns that cause drift.
+- 🔔 **Drift Notifications**: Automatically send alerts to Slack or Discord when drift is detected.
+- 🗺️ **Custom Type Mapping**: Map specialized database types to Blueprint methods.
 - 🧙 **Interactive Auto-Fix**: Automatically detects failing migrations and offers to add them to your skip list.
-- 📸 **Schema Snapshotting**: Save your ideal schema to JSON to speed up audits by skipping migration simulations.
-- 🧪 **Dry-Run Mode**: Use `--sql` to preview the migration code in your terminal without creating a file.
-- 📐 **Index Normalization**: Automatically matches indexes by column and type, ignoring naming discrepancies.
-- 📊 **Visual Dashboard**: A built-in Livewire component for real-time health monitoring (Local environment only).
-- 🛡️ **Total Isolation**: Redirection engine that prevents even hardcoded connections from leaking into your live DB.
+- 📸 **Schema Snapshotting**: Save your ideal schema to JSON to speed up audits.
+- 🧪 **Dry-Run Mode**: Use `--sql` to preview the migration code in your terminal.
+- 📊 **Visual Dashboard**: A built-in Livewire component for real-time health monitoring (Local only).
+- 📐 **Index Normalization**: Automatically matches indexes by column and type.
+- 🛡️ **Total Isolation**: Redirection engine that prevents leaking into your live DB.
 - 🤖 **CI/CD Ready**: Returns standard exit codes for automated pipeline enforcement.
-- 🧩 **UI Friendly**: Programmatic API via the `Sentinel` Facade for integration with custom admin panels or Livewire.
+- 🧩 **UI Friendly**: Programmatic API via the `Sentinel` Facade.
 
 ---
 
@@ -44,6 +55,36 @@ The primary way to use Sentinel is via the Artisan CLI.
 To see the gaps between your code and database:
 ```bash
 php artisan schema:drift
+```
+
+#### Audit Rollbacks (Reversibility)
+Simulate running ALL migrations and then rolling them all back:
+```bash
+php artisan schema:drift --rollback
+```
+
+#### Sync Across Environments
+Compare your Local schema against your Staging database:
+```bash
+php artisan schema:drift --compare-env=staging
+```
+
+#### Audit by Tag (Modular Apps)
+Only check migrations tagged with `@sentinel-tag billing`:
+```bash
+php artisan schema:drift --tag=billing
+```
+
+#### Audit Migration Files (Linter)
+To scan your migrations for anti-patterns that cause drift:
+```bash
+php artisan schema:sentinel-lint
+```
+
+#### Intelligent Config Upgrade
+If you are upgrading from an older version, run this to add new config options without losing your existing settings:
+```bash
+php artisan schema:sentinel-install
 ```
 
 #### Health Check (Doctor)
@@ -161,6 +202,13 @@ Quickly show an alert to administrators if the schema is out of sync.
         Run <code>php artisan schema:drift</code> to review.
     </div>
 @endif
+```
+
+#### 📊 Visual Dashboard (Livewire)
+You can drop the built-in dashboard component into any Blade view (e.g., your admin dashboard). It is automatically hidden in non-local environments for security.
+
+```blade
+<livewire:sentinel-database-health />
 ```
 
 ---

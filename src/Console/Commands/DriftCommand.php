@@ -22,6 +22,9 @@ class DriftCommand extends Command
                             {--fix : Generate a new migration to fix the drift}
                             {--sql : Display the SQL that would be executed to fix drift (Dry Run)}
                             {--snapshot= : Use a specific schema snapshot file instead of simulating migrations}
+                            {--tag= : Only audit migrations with this specific tag}
+                            {--rollback : Verify that migrations can be rolled back safely}
+                            {--compare-env= : Compare local schema against a different environment (connection)}
                             {--strict : Report extra tables and columns in the live DB}
                             {--interactive : Confirm each fix step-by-step}';
     
@@ -38,7 +41,8 @@ class DriftCommand extends Command
         SchemaParser $parser,
         DiffEngine $diffEngine,
         MigrationGenerator $generator,
-        \Sentinel\SchemaSentinel\Core\SnapshotManager $snapshotManager
+        \Sentinel\SchemaSentinel\Core\SnapshotManager $snapshotManager,
+        \Sentinel\SchemaSentinel\Support\NotificationManager $notifier
     ): int {
         if (app()->environment('production') && $this->option('fix') && !$this->confirm('You are in PRODUCTION. Are you sure you want to generate a drift-fix migration?')) {
             $this->components->error('Operation cancelled for safety.');
@@ -57,11 +61,16 @@ class DriftCommand extends Command
                 $this->components->task("Loading ideal schema from snapshot [{$snapshotName}]", function () use ($snapshotManager, $snapshotName, &$idealSchema) {
                     $idealSchema = $snapshotManager->load($snapshotName);
                 });
+            } elseif ($env = $this->option('compare-env')) {
+                $this->components->task("Connecting to environment: {$env}", function () use ($parser, $env, &$idealSchema) {
+                    $idealSchema = $parser->parse(\Illuminate\Support\Facades\DB::connection($env));
+                });
             } else {
                 // Simulate migrations if no snapshot provided
                 try {
-                    $this->components->task('Simulating migrations on Shadow DB', function () use ($shadowRunner, &$shadowConn) {
-                        $shadowConn = $shadowRunner->run();
+                    $tag = $this->option('tag');
+                    $this->components->task('Simulating migrations on Shadow DB' . ($tag ? " [Tag: {$tag}]" : ''), function () use ($shadowRunner, $tag, &$shadowConn) {
+                        $shadowConn = $shadowRunner->run($tag, $this->option('rollback'));
                     });
                 } catch (\Exception $e) {
                 $this->newLine();
@@ -103,6 +112,7 @@ class DriftCommand extends Command
                 
                 return 1;
             }
+        }
 
             // 2. Parse schemas
             $this->components->task('Parsing schemas', function () use ($parser, $shadowConn, &$liveSchema, &$idealSchema) {
@@ -121,9 +131,24 @@ class DriftCommand extends Command
             $diff = $diffEngine->compare($liveSchema, $idealSchema, $this->option('strict'));
 
             // 4. Visual Reporting
+            $score = $diff->getHealthScore();
+            $color = $score > 90 ? 'green' : ($score > 70 ? 'yellow' : 'red');
+            $this->newLine();
+            $this->line("  <fg=white;bg=gray> Health Score: </><fg=white;bg={$color}> {$score}% </>");
+            
             $this->renderReport($diff);
 
-            // 5. Cleanup
+            // 5. Cleanup and Performance Reporting
+            $migrationTimes = $shadowRunner->getMigrationTimes();
+            $slowMigrations = array_filter($migrationTimes, fn($time) => $time > 1.0); // 1 second threshold
+
+            if (!empty($slowMigrations)) {
+                $this->newLine();
+                $this->components->warn("Performance Alert: " . count($slowMigrations) . " slow migrations detected!");
+                foreach ($slowMigrations as $file => $time) {
+                    $this->line("  <fg=yellow>🐢</> <fg=cyan>{$file}</> took <fg=red>" . number_format($time, 2) . "s</>");
+                }
+            }
             $shadowRunner->cleanup();
 
             if ($diff->hasDifferences()) {
@@ -142,7 +167,17 @@ class DriftCommand extends Command
                     $this->components->info("Migration generated: " . basename($path));
                 }
                 
+                $notifier->notify($diff);
+
                 return 1; // Exit code 1 for CI if drift detected
+            }
+
+            // 6. Squash Advisor
+            $migrationFiles = \Illuminate\Support\Facades\File::files(database_path('migrations'));
+            if (count($migrationFiles) > 100) {
+                $this->newLine();
+                $this->components->warn("Performance Tip: You have " . count($migrationFiles) . " migrations. Consider squashing them to improve Sentinel speed.");
+                $this->line("    <fg=gray>Run: php artisan schema:dump</>");
             }
 
             return 0;

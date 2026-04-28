@@ -15,10 +15,16 @@ class ShadowMigrationRunner
     private const CONNECTION_NAME = 'sentinel_shadow';
 
     /**
+     * @var array<string, float>
+     */
+    protected array $migrationTimes = [];
+
+    /**
      * Run all migrations on a temporary in-memory database.
      */
-    public function run(): Connection
+    public function run(?string $tag = null, bool $testRollback = false): Connection
     {
+        $this->migrationTimes = [];
         $this->setupShadowConnection();
 
         $shadowConfig = Config::get('database.connections.' . self::CONNECTION_NAME);
@@ -27,8 +33,6 @@ class ShadowMigrationRunner
 
         try {
             // Total Isolation: Redirect ALL configured connections to the shadow DB.
-            // This prevents migrations that hardcode a connection (like Passport) 
-            // from accidentally hitting the live database.
             foreach (array_keys($originalConnections) as $name) {
                 if ($name === self::CONNECTION_NAME) {
                     continue;
@@ -44,18 +48,39 @@ class ShadowMigrationRunner
             $skipMigrations = Config::get('schema-sentinel.skip_migrations', []);
 
             foreach ($paths as $path) {
-                $runPath = $this->prepareMigrationPath($path, $skipMigrations);
+                $runPath = $this->prepareMigrationPath($path, $skipMigrations, $tag);
                 
-                Artisan::call('migrate', [
-                    '--database' => self::CONNECTION_NAME,
-                    '--path' => $runPath,
-                    '--force' => true,
-                ]);
+                $files = array_diff(scandir($runPath), ['.', '..']);
+                foreach ($files as $file) {
+                    $start = microtime(true);
+                    
+                    Artisan::call('migrate', [
+                        '--database' => self::CONNECTION_NAME,
+                        '--path' => $runPath . '/' . $file,
+                        '--force' => true,
+                    ]);
+
+                    $this->migrationTimes[$file] = microtime(true) - $start;
+
+                    if ($testRollback) {
+                        Artisan::call('migrate:rollback', [
+                            '--database' => self::CONNECTION_NAME,
+                            '--path' => $runPath . '/' . $file,
+                            '--force' => true,
+                        ]);
+                        
+                        Artisan::call('migrate', [
+                            '--database' => self::CONNECTION_NAME,
+                            '--path' => $runPath . '/' . $file,
+                            '--force' => true,
+                        ]);
+                    }
+                }
 
                 $this->cleanupTemporaryPath($runPath);
             }
         } finally {
-            // Restore original connection configurations
+            // Restore original connections
             foreach ($originalConnections as $name => $config) {
                 Config::set("database.connections.{$name}", $config);
                 DB::purge($name);
@@ -65,6 +90,11 @@ class ShadowMigrationRunner
         }
 
         return DB::connection(self::CONNECTION_NAME);
+    }
+
+    public function getMigrationTimes(): array
+    {
+        return $this->migrationTimes;
     }
 
     protected function setupShadowConnection(): void
@@ -82,9 +112,9 @@ class ShadowMigrationRunner
     }
 
     /**
-     * Prepare a temporary migration path to handle skipped migrations.
+     * Prepare a temporary migration path to handle skipped migrations and tags.
      */
-    protected function prepareMigrationPath(string $originalPath, array $skipMigrations): string
+    protected function prepareMigrationPath(string $originalPath, array $skipMigrations, ?string $tag = null): string
     {
         $absolutePath = base_path($originalPath);
         
@@ -92,7 +122,8 @@ class ShadowMigrationRunner
             return $originalPath; // Fallback to original if not a directory
         }
 
-        if (empty($skipMigrations)) {
+        // If no skip and no tag, use the original path directly
+        if (empty($skipMigrations) && empty($tag)) {
             return $originalPath;
         }
 
@@ -105,14 +136,30 @@ class ShadowMigrationRunner
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') continue;
             
+            $filePath = $absolutePath . '/' . $file;
+
             if (in_array($file, $skipMigrations)) {
                 continue; // Skip this migration
             }
 
-            copy($absolutePath . '/' . $file, $tempPath . '/' . $file);
+            if ($tag && !$this->fileHasTag($filePath, $tag)) {
+                continue; // Skip if it doesn't have the required tag
+            }
+
+            copy($filePath, $tempPath . '/' . $file);
         }
 
         return $tempPath;
+    }
+
+    /**
+     * Check if a migration file contains a specific tag.
+     */
+    protected function fileHasTag(string $path, string $tag): bool
+    {
+        $content = file_get_contents($path);
+        // Supports @sentinel-tag name or @sentinel-tag:name
+        return (bool) preg_match("/@sentinel-tag[:\s]+{$tag}/i", $content);
     }
 
     /**

@@ -33,4 +33,31 @@ readonly class SchemaDiff
                !empty($this->missingIndexes) ||
                !empty($this->missingForeignKeys);
     }
+
+    /**
+     * Calculate a health score from 0 to 100 based on discrepancies.
+     */
+    public function getHealthScore(): int
+    {
+        if (!$this->hasDifferences()) {
+            return 100;
+        }
+
+        $score = 100;
+
+        // Severe issues
+        $score -= count($this->missingTables) * 15;
+        
+        // Moderate issues
+        $score -= count($this->missingColumns) * 5;
+        $score -= count($this->mismatchedColumns) * 5;
+        $score -= count($this->missingForeignKeys) * 5;
+
+        // Minor issues
+        $score -= count($this->missingIndexes) * 2;
+        $score -= count($this->extraTables) * 2;
+        $score -= count($this->extraColumns) * 1;
+
+        return (int) max(0, $score);
+    }
 }

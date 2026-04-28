@@ -62,7 +62,7 @@ return [
     |
     */
     'defaults' => [
-        'strict' => false,
+        'strict' => env('SENTINEL_STRICT_MODE', false),
     ],
 
     /*
@@ -91,6 +91,46 @@ return [
     'data_audit_tables' => [
         // 'roles',
         // 'settings',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Type Mapping
+    |--------------------------------------------------------------------------
+    |
+    | Map specialized DB types to Laravel Blueprint methods.
+    | Example: 'citext' => 'string', 'geography' => 'geography'
+    |
+    */
+    'custom_types' => [
+        // 'citext' => 'string',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Get alerted when drift is detected. Perfect for CI/CD or production monitoring.
+    |
+    */
+    'notifications' => [
+        'enabled' => env('SENTINEL_NOTIFICATIONS_ENABLED', false),
+        'slack_webhook' => env('SENTINEL_SLACK_WEBHOOK'),
+        'discord_webhook' => env('SENTINEL_DISCORD_WEBHOOK'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pre-Migration Guard
+    |--------------------------------------------------------------------------
+    |
+    | Sentinel can hook into "php artisan migrate" and prevent it from running
+    | if schema drift is detected. This prevents "Partial Migration" disasters.
+    |
+    */
+    'guard' => [
+        'enabled' => env('SENTINEL_GUARD_ENABLED', false),
     ],
 
 ];

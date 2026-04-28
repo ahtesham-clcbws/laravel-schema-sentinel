@@ -217,7 +217,14 @@ PHP;
 
     protected function mapTypeToMethod(string $type): string
     {
-        return match (strtolower($type)) {
+        $type = strtolower($type);
+        $custom = config('schema-sentinel.custom_types', []);
+
+        if (isset($custom[$type])) {
+            return $custom[$type];
+        }
+
+        return match ($type) {
             'integer', 'int' => 'integer',
             'bigint' => 'bigint',
             'tinyint' => 'tinyInteger',
