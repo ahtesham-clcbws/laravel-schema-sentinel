@@ -209,8 +209,10 @@ class DriftCommand extends Command
 
         $content = file_get_contents($path);
         
-        if (str_contains($content, "'{$filename}'") || str_contains($content, "\"{$filename}\"")) {
-            return; // Already skipped
+        // Check if the filename is already in the array (and not commented out)
+        $escapedFilename = preg_quote($filename, '/');
+        if (preg_match("/^\s*['\"]{$escapedFilename}['\"],/m", $content)) {
+            return; // Already skipped and active
         }
 
         // Robust regex to find the skip_migrations array and append the new file
