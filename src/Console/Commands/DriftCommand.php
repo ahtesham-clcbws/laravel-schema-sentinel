@@ -194,10 +194,16 @@ class DriftCommand extends Command
      */
     protected function autoSkipMigration(string $filename): void
     {
-        $path = \Illuminate\Support\Facades\App::configPath('schema-sentinel.php');
+        $path = config_path('schema-sentinel.php');
         
         if (!file_exists($path)) {
-            // Fallback to local config if not published (unlikely in production usage)
+            $this->components->error("Configuration file not found at: {$path}");
+            $this->line("  Please publish the config first: <fg=cyan>php artisan vendor:publish --tag=\"schema-sentinel-config\"</>");
+            return;
+        }
+
+        if (!is_writable($path)) {
+            $this->components->error("Configuration file is not writable: {$path}");
             return;
         }
 
@@ -207,14 +213,18 @@ class DriftCommand extends Command
             return; // Already skipped
         }
 
-        // Regex to find the skip_migrations array and append the new file
+        // Robust regex to find the skip_migrations array and append the new file
         $pattern = "/(['\"]skip_migrations['\"]\s*=>\s*\[)/";
-        $replacement = "$1\n        '{$filename}',";
-        
-        $newContent = preg_replace($pattern, $replacement, $content);
-        
-        if ($newContent !== $content) {
-            file_put_contents($path, $newContent);
+        if (preg_match($pattern, $content)) {
+            $replacement = "$1\n        '{$filename}',";
+            $newContent = preg_replace($pattern, $replacement, $content);
+            
+            if ($newContent !== $content) {
+                file_put_contents($path, $newContent);
+            }
+        } else {
+            $this->components->error("Could not find 'skip_migrations' array in config file.");
+            $this->line("  Please add it manually to <fg=gray>config/schema-sentinel.php</>");
         }
     }
 }
