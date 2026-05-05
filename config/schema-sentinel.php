@@ -12,10 +12,21 @@ return [
     |
     */
     'shadow_connection' => [
-        'driver'   => 'sqlite',
-        'database' => ':memory:',
+        'driver'   => env('SENTINEL_SHADOW_DRIVER', 'sqlite'),
+        'host'     => env('SENTINEL_SHADOW_HOST', env('DB_HOST', '127.0.0.1')),
+        'port'     => env('SENTINEL_SHADOW_PORT', env('DB_PORT', '3306')),
+        'database' => env('SENTINEL_SHADOW_DB', ':memory:'),
+        'username' => env('SENTINEL_SHADOW_USER', env('DB_USERNAME', 'forge')),
+        'password' => env('SENTINEL_SHADOW_PASS', env('DB_PASSWORD', '')),
+        'charset'  => 'utf8mb4',
+        'collation' => 'utf8mb4_unicode_ci',
         'prefix'   => '',
-        'foreign_key_constraints' => false,
+        'foreign_key_constraints' => env('SENTINEL_SHADOW_FK', false),
+        /*
+        | Note: If you change the driver to 'mysql' or 'pgsql', ensure the 'database' 
+        | points to a DEDICATED EMPTY DATABASE. Sentinel will run migrations 
+        | here to simulate your schema. Using your live database will cause errors.
+        */
     ],
 
     /*
