@@ -1,18 +1,33 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Facades\File;
 use Sentinel\SchemaSentinel\Facades\Sentinel;
 
 /**
  * Generates automated Markdown documentation for the current database schema.
  */
+#[Signature('schema:docs {--output=DATABASE.md : The filename of the documentation}')]
+#[Description('Generate automated Markdown documentation for your database schema.')]
 class DocsCommand extends Command
 {
-    protected $signature = 'schema:docs {--output=DATABASE.md : The filename of the documentation}';
-    protected $description = 'Generate automated Markdown documentation for your database schema.';
+    /**
+     * The console command help.
+     */
+    protected $help = "Generate automated Markdown documentation of your entire database schema.
+
+Examples:
+  <fg=green>php artisan schema:docs</>
+  <fg=green>php artisan schema:docs --output=SCHEMA_GUIDE.md</>
+
+Options:
+  --output=filename   The output file name (defaults to DATABASE.md).";
 
     public function handle(): int
     {
@@ -53,7 +68,7 @@ class DocsCommand extends Command
             if (!empty($table->foreignKeys)) {
                 $markdown .= "### 🔗 Foreign Keys\n\n";
                 foreach ($table->foreignKeys as $fk) {
-                    $local = implode(', ', $fk->localColumns);
+                    $local = implode(', ', $fk->columns);
                     $foreign = implode(', ', $fk->foreignColumns);
                     $markdown .= "- `{$local}` -> `{$fk->foreignTable}({$foreign})` (On Delete: `{$fk->onDelete}`)\n";
                 }

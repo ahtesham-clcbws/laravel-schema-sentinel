@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel;
 
 use Illuminate\Support\ServiceProvider;
@@ -9,6 +11,10 @@ use Sentinel\SchemaSentinel\Console\Commands\SnapshotCommand;
 use Sentinel\SchemaSentinel\Console\Commands\InstallCommand;
 use Sentinel\SchemaSentinel\Console\Commands\LintCommand;
 use Sentinel\SchemaSentinel\Console\Commands\DocsCommand;
+use Sentinel\SchemaSentinel\Console\Commands\StandardizeIndexesCommand;
+use Sentinel\SchemaSentinel\Console\Commands\DataDriftCommand;
+use Sentinel\SchemaSentinel\Console\Commands\ReverseCommand;
+use Sentinel\SchemaSentinel\Console\Commands\HelpCommand;
 use Illuminate\Support\Facades\App;
 
 class SentinelServiceProvider extends ServiceProvider
@@ -19,7 +25,8 @@ class SentinelServiceProvider extends ServiceProvider
             return new Sentinel(
                 $app->make(\Sentinel\SchemaSentinel\Core\ShadowMigrationRunner::class),
                 $app->make(\Sentinel\SchemaSentinel\Core\SchemaParser::class),
-                $app->make(\Sentinel\SchemaSentinel\Core\DiffEngine::class)
+                $app->make(\Sentinel\SchemaSentinel\Core\DiffEngine::class),
+                $app->make(\Sentinel\SchemaSentinel\Core\ReverseEngineer::class)
             );
         });
     }
@@ -40,6 +47,10 @@ class SentinelServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 LintCommand::class,
                 DocsCommand::class,
+                StandardizeIndexesCommand::class,
+                DataDriftCommand::class,
+                ReverseCommand::class,
+                HelpCommand::class,
             ]);
         }
 

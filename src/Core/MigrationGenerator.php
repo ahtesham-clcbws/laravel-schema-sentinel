@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Core;
 
 use Illuminate\Support\Facades\File;
@@ -226,7 +228,7 @@ PHP;
 
         return match ($type) {
             'integer', 'int' => 'integer',
-            'bigint' => 'bigint',
+            'bigint' => 'bigInteger',
             'tinyint' => 'tinyInteger',
             'smallint' => 'smallInteger',
             'mediumint' => 'mediumInteger',

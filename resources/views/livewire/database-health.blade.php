@@ -11,13 +11,24 @@
             Database is in perfect sync with migrations!
         </div>
     @else
-        <div class="space-y-4">
+        <div class="space-y-6">
             @if(!empty($diff->missingTables))
                 <div>
-                    <h3 class="font-bold text-red-600">Missing Tables:</h3>
-                    <ul class="list-disc ml-6">
+                    <h3 class="font-bold text-red-600 mb-1">❌ Missing Tables:</h3>
+                    <ul class="list-disc ml-6 space-y-1">
                         @foreach($diff->missingTables as $table)
-                            <li>{{ $table->name }}</li>
+                            <li><span class="font-semibold">{{ $table->name }}</span></li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($diff->extraTables))
+                <div>
+                    <h3 class="font-bold text-yellow-600 mb-1">⚠️ Extra Tables (Strict Mode):</h3>
+                    <ul class="list-disc ml-6 space-y-1">
+                        @foreach($diff->extraTables as $table)
+                            <li><span class="font-semibold">{{ $table->name }}</span></li>
                         @endforeach
                     </ul>
                 </div>
@@ -25,10 +36,71 @@
 
             @if(!empty($diff->missingColumns))
                 <div>
-                    <h3 class="font-bold text-orange-600">Missing Columns:</h3>
-                    <ul class="list-disc ml-6">
+                    <h3 class="font-bold text-red-500 mb-1">❌ Missing Columns:</h3>
+                    <ul class="list-disc ml-6 space-y-1">
                         @foreach($diff->missingColumns as $c)
-                            <li><span class="font-mono">{{ $c['table'] }}</span> -> {{ $c['column']->name }}</li>
+                            <li><span class="font-mono bg-gray-100 px-1 rounded">{{ $c['table'] }}</span> -> <span class="font-semibold">{{ $c['column']->name }}</span> ({{ $c['column']->type }})</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($diff->extraColumns))
+                <div>
+                    <h3 class="font-bold text-yellow-500 mb-1">⚠️ Extra Columns:</h3>
+                    <ul class="list-disc ml-6 space-y-1">
+                        @foreach($diff->extraColumns as $c)
+                            <li><span class="font-mono bg-gray-100 px-1 rounded">{{ $c['table'] }}</span> -> <span class="font-semibold">{{ $c['column']->name }}</span></li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($diff->mismatchedColumns))
+                <div>
+                    <h3 class="font-bold text-orange-600 mb-1">🔄 Column Mismatches:</h3>
+                    <ul class="list-disc ml-6 space-y-2">
+                        @foreach($diff->mismatchedColumns as $c)
+                            <li>
+                                <span class="font-mono bg-gray-100 px-1 rounded">{{ $c['table'] }}</span> -> <span class="font-semibold">{{ $c['live']->name }}</span>
+                                <div class="ml-4 text-sm text-gray-600 space-y-0.5">
+                                    @foreach($c['diffs'] as $attr => $val)
+                                        <div>
+                                            <span class="capitalize">{{ $attr }}</span>: 
+                                            <span class="text-red-500 line-through">Live [{{ is_bool($val['live']) ? ($val['live'] ? 'true' : 'false') : ($val['live'] ?? 'null') }}]</span> vs 
+                                            <span class="text-green-600 font-semibold font-mono">Ideal [{{ is_bool($val['ideal']) ? ($val['ideal'] ? 'true' : 'false') : ($val['ideal'] ?? 'null') }}]</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($diff->missingIndexes))
+                <div>
+                    <h3 class="font-bold text-indigo-600 mb-1">🔑 Missing Indexes:</h3>
+                    <ul class="list-disc ml-6 space-y-1">
+                        @foreach($diff->missingIndexes as $idx)
+                            <li>
+                                Table <span class="font-mono bg-gray-100 px-1 rounded">{{ $idx['table'] }}</span>: 
+                                index <span class="font-semibold">{{ $idx['index']->name }}</span> on ({{ implode(', ', $idx['index']->columns) }})
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($diff->missingForeignKeys))
+                <div>
+                    <h3 class="font-bold text-purple-600 mb-1">🔗 Missing Foreign Keys:</h3>
+                    <ul class="list-disc ml-6 space-y-1">
+                        @foreach($diff->missingForeignKeys as $fk)
+                            <li>
+                                <span class="font-mono bg-gray-100 px-1 rounded">{{ $fk['table'] }}</span> -> ({{ implode(', ', $fk['fk']->columns) }}) 
+                                references <span class="font-semibold">{{ $fk['fk']->foreignTable }}</span>({{ implode(', ', $fk['fk']->foreignColumns) }})
+                            </li>
                         @endforeach
                     </ul>
                 </div>

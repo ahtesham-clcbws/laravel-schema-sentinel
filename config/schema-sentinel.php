@@ -144,4 +144,17 @@ return [
         'enabled' => env('SENTINEL_GUARD_ENABLED', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Index Standardization Settings
+    |--------------------------------------------------------------------------
+    |
+    | Define custom naming conventions and auditing rules for index validation.
+    |
+    */
+    'index_standards' => [
+        'naming_format' => '[table]_[columns]_[type]',
+        'ignore_primary' => true,
+    ],
+
 ];

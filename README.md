@@ -4,228 +4,281 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/clcbws/laravel-schema-sentinel.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
 [![License](https://img.shields.io/github/license/ahtesham-clcbws/laravel-schema-sentinel?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/blob/main/LICENSE)
 
-**Laravel Schema Sentinel** is a premium database integrity tool designed to detect and resolve "Schema Drift"—the discrepancies between your migration files and your actual live database. Fully optimized for **Laravel 13.x**, with legacy support for 12.x and 11.x.
+**Laravel Schema Sentinel** is a premium database schema integrity and governance suite. It detects and resolves "Schema Drift" (discrepancies between migration blueprints and the actual database state) and provides automated tools to standardize index configurations, audit content syncs, lint migration files, and reverse-engineer legacy tables.
 
 ---
 
-## ✨ Key Features
+## 📖 Table of Contents
 
-- 🛡️ **Deep Drift Detection**: Audits Tables, Columns, Types, Nullability, Defaults, Indexes, and Foreign Keys.
-- 🐢 **Slow Migration Detector**: Identifies migrations that take too long to run, preventing production downtime.
-- 📄 **Auto-Documentation**: Generate comprehensive Markdown documentation (`DATABASE.md`) of your entire schema.
-- 🔄 **Rollback Audit**: Verify that your migrations can be rolled back safely without breaking the DB schema.
-- 🌍 **Cross-Environment Sync**: Compare your local schema against Staging or Production directly.
-- 📉 **Squash Advisor**: Detects bloated migration folders and suggests optimizations to speed up your workflow.
-- 💯 **Schema Health Score**: Get a quantifiable percentage (0-100%) of your database integrity.
-- 🚦 **Pre-Migration Guard**: Automatically block `php artisan migrate` if drift is detected.
-- 🏷️ **Tagged Auditing**: Group migrations by tags and audit specific modules using the `--tag` option.
-- 🧹 **Migration Linter**: Audit your migration files for anti-patterns that cause drift.
-- 🔔 **Drift Notifications**: Automatically send alerts to Slack or Discord when drift is detected.
-- 🗺️ **Custom Type Mapping**: Map specialized database types to Blueprint methods.
-- 🧙 **Interactive Auto-Fix**: Automatically detects failing migrations and offers to add them to your skip list.
-- 📸 **Schema Snapshotting**: Save your ideal schema to JSON to speed up audits.
-- 🧪 **Dry-Run Mode**: Use `--sql` to preview the migration code in your terminal.
-- 📊 **Visual Dashboard**: A built-in Livewire component for real-time health monitoring (Local only).
-- 📐 **Index Normalization**: Automatically matches indexes by column and type.
-- 🛡️ **Total Isolation**: Redirection engine that prevents leaking into your live DB.
-- 🤖 **CI/CD Ready**: Returns standard exit codes for automated pipeline enforcement.
-- 🧩 **UI Friendly**: Programmatic API via the `Sentinel` Facade.
+- [Getting Started](#-getting-started)
+  - [Introduction](#introduction)
+  - [Key Features](#key-features)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+- [Artisan Commands](#-artisan-commands)
+  - [Auditing Schema Drift (`schema:drift`)](#auditing-schema-drift-schemadrift)
+  - [Index Standardization (`schema:standardize-indexes`)](#index-standardization-schemastandardize-indexes)
+  - [Data Drift Deep Dive (`schema:data-drift`)](#data-drift-deep-dive-schemadata-drift)
+  - [Legacy Database Reversing (`schema:reverse`)](#legacy-database-reversing-schemareverse)
+  - [Migration File Linter (`schema:sentinel-lint`)](#migration-file-linter-schemasentinel-lint)
+  - [Environment Doctor (`schema:sentinel-doctor`)](#environment-doctor-schemasentinel-doctor)
+- [Programmatic API](#-programmatic-api)
+  - [Drift Auditing](#drift-auditing)
+  - [Parsing Schema DTOs](#parsing-schema-dtos)
+  - [Index Standardization](#index-standardization)
+  - [Data Drift Audits](#data-drift-audits)
+  - [Programmatic Reversing](#programmatic-reversing)
+  - [Livewire Component & Blade UI](#livewire-component--blade-ui)
+- [Legacy Compatibility](#-legacy-compatibility)
+- [Changelogs](#-changelogs)
 
 ---
 
-## 📦 Installation
+## 🚀 Getting Started
 
-You can install the package via composer:
+### Introduction
+
+In modern application deployment, database schemas can easily drift from migration files due to hotfixes, legacy imports, direct database edits, or faulty rollbacks. Schema Sentinel provides a total isolation simulation engine that runs migrations on a shadow database to establish the "ideal" schema, matches it against your live connection, and generates fixes automatically.
+
+### Key Features
+
+*   🛡️ **Deep Drift Detection**: Audits Tables, Columns, Types, Nullability, Defaults, Indexes, and Foreign Keys.
+*   ⚡ **Programmatic Facade**: Full API coverage for building custom monitoring dashboards.
+*   📐 **Index Naming Standardizer**: Automatically validates index names against Laravel conventions.
+*   🐢 **Slow Migration Audit**: Pinpoints slow migration files during simulation.
+*   🔄 **Rollback Audit**: Simulates rollbacks to ensure your schema can be cleanly rolled back.
+*   🌍 **Cross-Environment Sync**: Compare your schema against other environments (Staging/Production).
+*   🤖 **CI/CD Ready**: Returns standard shell exit codes for pipeline validation.
+
+### Installation
+
+Install the package via Composer:
 
 ```bash
 composer require clcbws/laravel-schema-sentinel
 ```
 
-The service provider and facade will be automatically registered.
+The service provider and facade will be registered automatically.
 
----
+### Configuration
 
-## 🚀 Usage
-
-### 1. Terminal Interface (Artisan)
-
-The primary way to use Sentinel is via the Artisan CLI.
-
-#### Check for Drift
-To see the gaps between your code and database:
-```bash
-php artisan schema:drift
-```
-
-#### Audit Rollbacks (Reversibility)
-Simulate running ALL migrations and then rolling them all back:
-```bash
-php artisan schema:drift --rollback
-```
-
-#### Sync Across Environments
-Compare your Local schema against your Staging database:
-```bash
-php artisan schema:drift --compare-env=staging
-```
-
-#### Audit by Tag (Modular Apps)
-Only check migrations tagged with `@sentinel-tag billing`:
-```bash
-php artisan schema:drift --tag=billing
-```
-
-#### Audit Migration Files (Linter)
-To scan your migrations for anti-patterns that cause drift:
-```bash
-php artisan schema:sentinel-lint
-```
-
-#### Intelligent Config Upgrade
-If you are upgrading from an older version, run this to add new config options without losing your existing settings:
-```bash
-php artisan schema:sentinel-install
-```
-
-#### Health Check (Doctor)
-To verify your environment is ready for Sentinel:
-```bash
-php artisan schema:sentinel-doctor
-```
-
-#### Create a Schema Snapshot
-To freeze your current ideal schema for faster future audits:
-```bash
-php artisan schema:snapshot
-```
-
-#### Use a Snapshot for Drift Check
-```bash
-php artisan schema:drift --snapshot=latest
-```
-
-#### Dry-Run (SQL Preview)
-To see the migration code without creating any files:
-```bash
-php artisan schema:drift --sql
-```
-
-#### Fix Drift Interactively
-To generate a new migration file while reviewing each change:
-```bash
-php artisan schema:drift --fix --interactive
-```
-
-#### Strict Mode
-To identify extra columns or tables in the DB that shouldn't be there:
-```bash
-php artisan schema:drift --strict
-```
-
----
-
-## ⚙️ Configuration
-
-You can publish the configuration file using:
+Publish the configuration file:
 
 ```bash
 php artisan vendor:publish --tag="schema-sentinel-config"
 ```
 
-The config file allows you to:
-- Define **Ignored Tables** (e.g., third-party package tables).
-- Add **Custom Migration Paths** for modular apps.
-- Configure the **Shadow Connection** settings.
-- **Skip Migrations** that are broken or incompatible with SQLite.
+This creates `config/schema-sentinel.php` which allows you to define:
+- **`ignore_tables`**: Array of table names to exclude from analysis (e.g., `migrations`, `telescope_entries`).
+- **`migration_paths`**: Paths to your migration files (useful for modular applications).
+- **`shadow_connection`**: Temporary database settings (defaults to isolated SQLite in-memory).
+- **`skip_migrations`**: List of migration files to skip during shadow simulation.
+- **`notifications`**: Slack and Discord webhooks for drift alerts.
 
 ---
 
-## 🛠️ Troubleshooting
+## 💻 Artisan Commands
 
-### Shadow Migration Failures
-If `php artisan schema:drift` fails during the simulation step, it usually means your `database/migrations` folder is incomplete or has SQLite incompatibilities.
+### Auditing Schema Drift (`schema:drift`)
 
-1. **Missing Tables**: If a migration tries to `Schema::table()` a table that wasn't created in an earlier migration, the simulation will fail.
-2. **Interactive Skip**: Sentinel will identify the failing file and ask: `Would you like me to add it for you automatically?`. Typing `y` will add it to your `skip_migrations` config.
-3. **MySQL Shadow**: If your migrations use MySQL-specific features (spatial types, complex alters), change the `shadow_connection` driver to `mysql` in `config/schema-sentinel.php` to use a real MySQL database for simulation.
+Run the core schema audit to inspect the health of your database:
+
+```bash
+php artisan schema:drift
+```
+
+#### Options:
+
+*   **`--fix`**: Generate a new Laravel migration to align your database.
+*   **`--interactive`**: Confirm column changes step-by-step.
+*   **`--sql`**: Preview generated SQL code in dry-run mode.
+*   **`--strict`**: Report extra tables and columns in the live DB that are not defined in migrations.
+*   **`--rollback`**: Run migrations and roll them back on the shadow DB to verify reversibility.
+*   **`--snapshot[=latest]`**: Use a frozen JSON snapshot for audit speed.
+*   **`--tag=name`**: Limit audits to migrations marked with `@sentinel-tag name`.
 
 ---
 
-### 2. UI Integration (Controllers, Livewire, Blade)
+### Index Standardization (`schema:standardize-indexes`)
 
-Sentinel provides a powerful programmatic API via the `Sentinel` facade, allowing you to build custom database monitoring dashboards.
+Inspect your database for non-standard index names and redundant indexes (e.g., column indexes already covered by composite index prefixes):
 
-#### 🎮 Controller Usage
-Perfect for building custom admin APIs or JSON health endpoints.
+```bash
+php artisan schema:standardize-indexes
+```
+
+#### Options:
+*   **`--fix`**: Generate a migration file to automatically rename deviating indexes and drop duplicate ones.
+
+---
+
+### Data Drift Deep Dive (`schema:data-drift`)
+
+Audit static lookup or seed tables to verify content consistency between environments:
+
+```bash
+php artisan schema:data-drift --compare-env=production
+```
+
+Outputs a terminal-based diff table indicating missing, extra, or mismatched rows.
+
+---
+
+### Legacy Database Reversing (`schema:reverse`)
+
+Reverse-engineer a legacy database into a clean Laravel setup:
+
+```bash
+php artisan schema:reverse --path=./exports
+```
+
+#### Options:
+*   **`--models`**: Generate Eloquent Model classes with typed relationships (`belongsTo`, `hasMany`) and docblocks.
+*   **`--migrations`**: Generate Blueprint migration files.
+*   **`--seeders`**: Generate seeders filled with sample database records.
+*   **`--enums`**: Generate native PHP 8.4 Backed Enums linked to model casts.
+
+---
+
+### Migration File Linter (`schema:sentinel-lint`)
+
+Audit your codebase migrations for anti-patterns that can cause drift:
+
+```bash
+php artisan schema:sentinel-lint
+```
+
+Scans for:
+1. Raw `DB::statement` calls.
+2. Hardcoded platform-specific string default dates (like `'CURRENT_TIMESTAMP'`).
+3. Unsafe `Schema::drop` calls lacking `IfExists`.
+
+---
+
+### Environment Doctor (`schema:sentinel-doctor`)
+
+Run the health advisor to verify your environment configurations (PHP version, PDO drivers, shadow connection configs):
+
+```bash
+php artisan schema:sentinel-doctor
+```
+
+---
+
+### Help Guides & Spelling Matcher (`schema:help`)
+
+Get detailed command help, configuration tips, and options. If you make a typo, the built-in Levenshtein suggestion engine will automatically suggest the correct command:
+
+```bash
+php artisan schema:help drft
+```
+
+---
+
+## 🔌 Programmatic API
+
+You can integrate Sentinel programmatically inside controllers, dashboards, or deployment hooks using the `Sentinel` facade.
+
+### Drift Auditing
 
 ```php
 use Sentinel\SchemaSentinel\Facades\Sentinel;
 
-public function checkStatus()
-{
-    $diff = Sentinel::check(strict: true);
+$diff = Sentinel::check(strict: true);
 
-    return response()->json([
-        'in_sync' => !$diff->hasDifferences(),
-        'drift' => $diff->toArray(), // DTOs are arrayable
-    ]);
+if ($diff->hasDifferences()) {
+    // Schema has drifted
+    $healthScore = $diff->getHealthScore();
+    $missingTables = $diff->missingTables;
 }
 ```
 
-#### ⚡ Livewire Integration
-Build a real-time "Database Health" indicator for your admin panel.
+### Parsing Schema DTOs
+
+Extract structured metadata representing your database layout:
 
 ```php
-namespace App\Livewire;
-
-use Livewire\Component;
-use Sentinel\SchemaSentinel\Facades\Sentinel;
-
-class DatabaseHealth extends Component
-{
-    public function render()
-    {
-        return view('livewire.database-health', [
-            'diff' => Sentinel::check(),
-        ]);
-    }
-}
+$tables = Sentinel::parse(); // Returns array of TableDefinition DTOs
 ```
 
-#### 🍃 Blade Templates
-Quickly show an alert to administrators if the schema is out of sync.
+### Index Standardization
+
+Run the index analyzer programmatically:
+
+```php
+$results = Sentinel::standardizeIndexes();
+// Returns array with 'deviations' and 'redundant' indexes
+```
+
+### Data Drift Audits
+
+Audit data consistency against a target connection:
+
+```php
+$dataDrift = Sentinel::dataDrift('production');
+```
+
+### Programmatic Reversing
+
+Trigger the reverse engineering generator from code:
+
+```php
+$results = Sentinel::reverse([
+    'path' => base_path('exports'),
+    'models' => true,
+    'migrations' => true,
+    'seeders' => false,
+    'enums' => true,
+]);
+```
+
+### Livewire Component & Blade UI
+
+Display database integrity metrics inside your admin templates:
 
 ```blade
-@if(app()->environment('local') && \Sentinel\SchemaSentinel\Facades\Sentinel::check()->hasDifferences())
-    <div class="alert alert-warning">
-        <strong>🛡️ Sentinel Notice:</strong> Your database schema has drifted from your migrations. 
-        Run <code>php artisan schema:drift</code> to review.
+<!-- Livewire Component -->
+<livewire:sentinel-database-health />
+```
+
+Or check programmatically in Blade layouts:
+
+```blade
+@if(\Sentinel\SchemaSentinel\Facades\Sentinel::check()->hasDifferences())
+    <div class="alert alert-danger">
+        Warning: Database schema drift detected!
     </div>
 @endif
 ```
 
-#### 📊 Visual Dashboard (Livewire)
-You can drop the built-in dashboard component into any Blade view (e.g., your admin dashboard). It is automatically hidden in non-local environments for security.
+---
 
-```blade
-<livewire:sentinel-database-health />
+## ⚠️ Legacy Compatibility
+
+While the latest version of this package requires **Laravel 13.x** and **PHP 8.4+**, developers running **Laravel 11.x or 12.x** (with PHP 8.2 or 8.3) can use the stable **v1.6.0** release:
+
+```bash
+composer require clcbws/laravel-schema-sentinel:~1.6.0
 ```
 
----
-
-## 🏗️ Architecture
-
-Sentinel follows a strictly decoupled architecture:
-1. **Shadow Runner**: Builds a "Shadow DB" by running all migrations.
-2. **Schema Parser**: Normalizes both Live and Shadow schemas into DTOs.
-3. **Diff Engine**: Analyzes the DTOs to find discrepancies.
-4. **Migration Generator**: Translates the diff into valid Laravel PHP code.
+| Laravel Version | Supported PHP Versions | Package Version |
+| :--- | :--- | :--- |
+| **Laravel 11.x** | PHP `8.2` - `8.4` | `~1.6.0` |
+| **Laravel 12.x** | PHP `8.2` - `8.5` | `~1.6.0` |
 
 ---
 
-## 📄 License
+## 📄 Changelogs
 
-The MIT License (MIT). Please see [License File](LICENSE) for more information.
+### Latest Release: v2.0.0
+
+*   **Index Standardizer & Optimizer**: Detects duplicate indexes and enforces Laravel naming conventions.
+*   **Data Drift Engine**: Audits static data tables across different database connections.
+*   **Legacy Bridge Generator**: Reverse-engineers databases into modern migrations, models with relationships, seeders, and PHP 8.4 Backed Enums.
+*   **PHP 8.4 / Laravel 13 Alignment**: Full type-safety compliance, strict typing enabled file-wide, and console command attributes.
+*   **CLI Bug Fixes**: Corrected infinite loop retry states, docs property errors, and bigInt mappings.
+
+For past version releases, see [changelogs/v1.0.0.md](changelogs/v1.0.0.md) and [changelogs/v1.6.0.md](changelogs/v1.6.0.md).
 
 ---
 
@@ -233,5 +286,4 @@ The MIT License (MIT). Please see [License File](LICENSE) for more information.
 
 - **Author**: [Ahtesham](mailto:ahtesham@clcbws.com)
 - **Company**: [Broadway Web Service](https://www.clcbws.com)
-
----
+- **License**: [MIT License](LICENSE)

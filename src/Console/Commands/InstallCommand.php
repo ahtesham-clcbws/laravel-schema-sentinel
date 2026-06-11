@@ -1,21 +1,34 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\App;
 
 /**
  * Handles the installation and intelligent upgrading of the package configuration.
  */
+#[Signature('schema:sentinel-install')]
+#[Description('Install or upgrade the Sentinel configuration file without losing existing settings.')]
 class InstallCommand extends Command
 {
-    protected $signature = 'schema:sentinel-install';
-    protected $description = 'Install or upgrade the Sentinel configuration file without losing existing settings.';
+    /**
+     * The console command help.
+     */
+    protected $help = "Install or upgrade the Sentinel configuration file without losing existing settings.
+
+Examples:
+  <fg=green>php artisan schema:sentinel-install</>";
 
     public function handle(): int
     {
+        \Sentinel\SchemaSentinel\Support\Telemetry::dispatch();
+
         $this->components->info('Schema Sentinel Installation/Upgrade');
 
         $configPath = App::configPath('schema-sentinel.php');
@@ -59,6 +72,7 @@ class InstallCommand extends Command
             'custom_types' => 'Custom Type Mapping',
             'notifications' => 'Notifications',
             'guard' => 'Pre-Migration Guard',
+            'index_standards' => 'Index Standardization Settings',
         ];
 
         $updated = false;

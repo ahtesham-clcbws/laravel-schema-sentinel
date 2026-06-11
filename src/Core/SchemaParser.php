@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Core;
 
 use Illuminate\Database\Connection;
@@ -58,9 +60,16 @@ class SchemaParser
             $indexDefinitions = [];
             foreach ($indexes as $index) {
                 $idx = (object) $index;
+                $type = $idx->type ?? 'index';
+                if (!empty($idx->primary)) {
+                    $type = 'primary';
+                } elseif (!empty($idx->unique)) {
+                    $type = 'unique';
+                }
+
                 $indexDefinitions[$idx->name] = new IndexDefinition(
                     name: $idx->name,
-                    type: $idx->type,
+                    type: $type,
                     columns: $idx->columns,
                 );
             }
@@ -70,8 +79,9 @@ class SchemaParser
             $fkDefinitions = [];
             foreach ($fks as $fk) {
                 $f = (object) $fk;
-                $fkDefinitions[$f->name] = new ForeignKeyDefinition(
-                    name: $f->name,
+                $name = $f->name ?? ($tableName . '_' . implode('_', $f->columns) . '_foreign');
+                $fkDefinitions[$name] = new ForeignKeyDefinition(
+                    name: $name,
                     columns: $f->columns,
                     foreignTable: $f->foreign_table,
                     foreignColumns: $f->foreign_columns,

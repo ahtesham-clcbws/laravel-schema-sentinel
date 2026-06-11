@@ -1,17 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Facades\File;
 
 /**
  * Audits migration files for anti-patterns and drift-prone code.
  */
+#[Signature('schema:sentinel-lint')]
+#[Description('Audit your migration files for potential drift-causing patterns.')]
 class LintCommand extends Command
 {
-    protected $signature = 'schema:sentinel-lint';
-    protected $description = 'Audit your migration files for potential drift-causing patterns.';
+    /**
+     * The console command help.
+     */
+    protected $help = "Audit migration files for potential drift-causing patterns.
+
+Examples:
+  <fg=green>php artisan schema:sentinel-lint</>";
 
     public function handle(): int
     {

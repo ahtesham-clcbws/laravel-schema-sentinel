@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Tests;
 
 use Orchestra\Testbench\TestCase as Orchestra;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Support;
 
 use Illuminate\Support\Facades\Http;
@@ -14,7 +16,7 @@ class NotificationManager
     {
         $config = config('schema-sentinel.notifications');
 
-        if (!$config['enabled'] || !$diff->hasDifferences()) {
+        if (!$config || !($config['enabled'] ?? false) || !$diff->hasDifferences()) {
             return;
         }
 

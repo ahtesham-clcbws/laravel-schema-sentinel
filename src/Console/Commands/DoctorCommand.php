@@ -1,25 +1,38 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Sentinel\SchemaSentinel\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 
 /**
  * Health check command for Laravel Schema Sentinel.
  */
+#[Signature('schema:sentinel-doctor')]
+#[Description('Check if your environment is properly configured for Schema Sentinel.')]
 class DoctorCommand extends Command
 {
-    protected $signature = 'schema:sentinel-doctor';
-    protected $description = 'Check if your environment is properly configured for Schema Sentinel.';
+    /**
+     * The console command help.
+     */
+    protected $help = "Check if your environment is properly configured for Schema Sentinel.
+
+Examples:
+  <fg=green>php artisan schema:sentinel-doctor</>";
 
     public function handle(): int
     {
+        \Sentinel\SchemaSentinel\Support\Telemetry::dispatch();
+
         $this->components->info('Running Schema Sentinel Health Check...');
 
         $checks = [
-            'PHP Version (>= 8.2)' => version_compare(PHP_VERSION, '8.2.0', '>='),
+            'PHP Version (>= 8.4)' => version_compare(PHP_VERSION, '8.4.0', '>='),
             'PDO SQLite Extension' => extension_loaded('pdo_sqlite'),
             'Config File' => file_exists(\Illuminate\Support\Facades\App::configPath('schema-sentinel.php')) || file_exists(__DIR__.'/../../../config/schema-sentinel.php'),
             'Database Connection' => $this->checkConnection(),

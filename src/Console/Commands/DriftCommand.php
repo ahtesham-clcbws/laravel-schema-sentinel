@@ -28,10 +28,29 @@ class DriftCommand extends Command
                             {--strict : Report extra tables and columns in the live DB}
                             {--interactive : Confirm each fix step-by-step}';
     
-    /**
-     * The console command description.
-     */
     protected $description = 'Detect and report schema drift between migrations and the live database.';
+
+    /**
+     * The console command help.
+     */
+    protected $help = "Audit database schema drift against migration blueprints.
+
+Examples:
+  <fg=green>php artisan schema:drift</>
+  <fg=green>php artisan schema:drift --strict</>
+  <fg=green>php artisan schema:drift --fix --interactive</>
+  <fg=green>php artisan schema:drift --compare-env=production --sql</>
+  <fg=green>php artisan schema:drift --snapshot=latest</>
+  <fg=green>php artisan schema:drift --tag=billing</>
+
+Options:
+  --fix               Generate a Laravel migration to resolve detected drift.
+  --strict            Report extra columns and tables present in DB but missing in code.
+  --sql               Dry-run: Outputs the SQL statements that would align the schemas.
+  --rollback          Rolls back and re-applies migrations to test reversibility.
+  --snapshot=latest   Uses a pre-saved snapshot instead of simulating migrations.
+  --compare-env=staging Compares local database against another connection.
+  --interactive       Prompts for confirmation at each drift fix step.";
 
     /**
      * Execute the console command.
@@ -51,20 +70,22 @@ class DriftCommand extends Command
 
         $this->components->info('Starting Schema Drift Analysis...');
 
-        while (true) {
-            $shadowConn = null;
-            $liveSchema = [];
-            $idealSchema = [];
+        $shadowConn = null;
+        $liveSchema = [];
+        $idealSchema = [];
 
+        while (true) {
             // 1. Obtain Ideal Schema
             if ($snapshotName = $this->option('snapshot')) {
                 $this->components->task("Loading ideal schema from snapshot [{$snapshotName}]", function () use ($snapshotManager, $snapshotName, &$idealSchema) {
                     $idealSchema = $snapshotManager->load($snapshotName);
                 });
+                break;
             } elseif ($env = $this->option('compare-env')) {
                 $this->components->task("Connecting to environment: {$env}", function () use ($parser, $env, &$idealSchema) {
                     $idealSchema = $parser->parse(\Illuminate\Support\Facades\DB::connection($env));
                 });
+                break;
             } else {
                 // Simulate migrations if no snapshot provided
                 try {
@@ -72,116 +93,117 @@ class DriftCommand extends Command
                     $this->components->task('Simulating migrations on Shadow DB' . ($tag ? " [Tag: {$tag}]" : ''), function () use ($shadowRunner, $tag, &$shadowConn) {
                         $shadowConn = $shadowRunner->run($tag, $this->option('rollback'));
                     });
+                    break;
                 } catch (\Exception $e) {
-                $this->newLine();
-                $this->components->error('Shadow migration simulation failed!');
-                $this->line("  <fg=red>Error:</> " . $e->getMessage());
-                
-                // Try to extract the failing migration filename from the stack trace
-                $failingFile = null;
-                if (preg_match('/database\/migrations\/([^\s:]+\.php)/', $e->getTraceAsString(), $matches)) {
-                    $failingFile = $matches[1];
-                }
-
-                $this->newLine();
-                $this->components->warn('Potential Solutions:');
-                
-                if ($failingFile) {
-                    $this->line("  <fg=white>1. Skip the failing migration:</>");
-                    $this->line("     Add <fg=cyan>'{$failingFile}'</> to the <fg=green>'skip_migrations'</> array in <fg=gray>config/schema-sentinel.php</>");
+                    $this->newLine();
+                    $this->components->error('Shadow migration simulation failed!');
+                    $this->line("  <fg=red>Error:</> " . $e->getMessage());
                     
-                    if ($this->confirm("Would you like me to add it and retry automatically?")) {
-                        $this->autoSkipMigration($failingFile);
+                    // Try to extract the failing migration filename from the stack trace
+                    $failingFile = null;
+                    if (preg_match('/database\/migrations\/([^\s:]+\.php)/', $e->getTraceAsString(), $matches)) {
+                        $failingFile = $matches[1];
+                    }
+
+                    $this->newLine();
+                    $this->components->warn('Potential Solutions:');
+                    
+                    if ($failingFile) {
+                        $this->line("  <fg=white>1. Skip the failing migration:</>");
+                        $this->line("     Add <fg=cyan>'{$failingFile}'</> to the <fg=green>'skip_migrations'</> array in <fg=gray>config/schema-sentinel.php</>");
                         
-                        // Update in-memory config for the retry
-                        $currentSkips = config('schema-sentinel.skip_migrations', []);
-                        $currentSkips[] = $failingFile;
-                        \Illuminate\Support\Facades\Config::set('schema-sentinel.skip_migrations', $currentSkips);
-                        
-                        $this->components->info("Migration skipped. Retrying simulation...");
+                        if ($this->confirm("Would you like me to add it and retry automatically?")) {
+                            $this->autoSkipMigration($failingFile);
+                            
+                            // Update in-memory config for the retry
+                            $currentSkips = config('schema-sentinel.skip_migrations', []);
+                            $currentSkips[] = $failingFile;
+                            \Illuminate\Support\Facades\Config::set('schema-sentinel.skip_migrations', $currentSkips);
+                            
+                            $this->components->info("Migration skipped. Retrying simulation...");
+                            $this->newLine();
+                            continue; // Restart the while loop
+                        }
                         $this->newLine();
-                        continue; // Restart the while loop
                     }
-                    $this->newLine();
-                }
 
-                $this->line('  <fg=white>' . ($failingFile ? '2' : '1') . '. Check for Missing Tables:</> This migration might be trying to modify a table that was never created.');
-                $this->line('  <fg=white>' . ($failingFile ? '3' : '2') . '. SQLite Incompatibility:</> Your migrations might use MySQL-specific features.');
-                $this->line('    <fg=gray>Solution: Change "shadow_connection" to a MySQL driver in config/schema-sentinel.php</>');
-                $this->newLine();
-                
-                return 1;
+                    $this->line('  <fg=white>' . ($failingFile ? '2' : '1') . '. Check for Missing Tables:</> This migration might be trying to modify a table that was never created.');
+                    $this->line('  <fg=white>' . ($failingFile ? '3' : '2') . '. SQLite Incompatibility:</> Your migrations might use MySQL-specific features.');
+                    $this->line('    <fg=gray>Solution: Change "shadow_connection" to a MySQL driver in config/schema-sentinel.php</>');
+                    $this->newLine();
+                    
+                    return 1;
+                }
             }
         }
 
-            // 2. Parse schemas
-            $this->components->task('Parsing schemas', function () use ($parser, $shadowConn, &$liveSchema, &$idealSchema) {
-                $liveSchema = $parser->parse(DB::connection());
-                
-                // Only parse ideal if we didn't load it from a snapshot
-                if (empty($idealSchema)) {
-                    if (!$shadowConn instanceof \Illuminate\Database\Connection) {
-                        throw new \RuntimeException('Shadow connection failed to initialize.');
-                    }
-                    $idealSchema = $parser->parse($shadowConn);
-                }
-            });
-
-            // 3. Diff Analysis
-            $diff = $diffEngine->compare($liveSchema, $idealSchema, $this->option('strict'));
-
-            // 4. Visual Reporting
-            $score = $diff->getHealthScore();
-            $color = $score > 90 ? 'green' : ($score > 70 ? 'yellow' : 'red');
-            $this->newLine();
-            $this->line("  <fg=white;bg=gray> Health Score: </><fg=white;bg={$color}> {$score}% </>");
+        // 2. Parse schemas
+        $this->components->task('Parsing schemas', function () use ($parser, $shadowConn, &$liveSchema, &$idealSchema) {
+            $liveSchema = $parser->parse(DB::connection());
             
-            $this->renderReport($diff);
-
-            // 5. Cleanup and Performance Reporting
-            $migrationTimes = $shadowRunner->getMigrationTimes();
-            $slowMigrations = array_filter($migrationTimes, fn($time) => $time > 1.0); // 1 second threshold
-
-            if (!empty($slowMigrations)) {
-                $this->newLine();
-                $this->components->warn("Performance Alert: " . count($slowMigrations) . " slow migrations detected!");
-                foreach ($slowMigrations as $file => $time) {
-                    $this->line("  <fg=yellow>🐢</> <fg=cyan>{$file}</> took <fg=red>" . number_format($time, 2) . "s</>");
+            // Only parse ideal if we didn't load it from a snapshot
+            if (empty($idealSchema)) {
+                if (!$shadowConn instanceof \Illuminate\Database\Connection) {
+                    throw new \RuntimeException('Shadow connection failed to initialize.');
                 }
+                $idealSchema = $parser->parse($shadowConn);
             }
-            $shadowRunner->cleanup();
+        });
 
-            if ($diff->hasDifferences()) {
-                if ($this->option('sql')) {
-                    $this->newLine();
-                    $this->components->info('Dry Run: Generated Migration Code');
-                    $code = $generator->buildMigrationCode($diff, $this->option('interactive'));
-                    $this->line("\n<fg=gray>/* --- Generated Migration --- */</>");
-                    $this->line("<fg=green>{$code}</>");
-                    $this->newLine();
-                    return 0;
-                }
+        // 3. Diff Analysis
+        $diff = $diffEngine->compare($liveSchema, $idealSchema, $this->option('strict'));
 
-                if ($this->option('fix')) {
-                    $path = $generator->generate($diff, $this->option('interactive'));
-                    $this->components->info("Migration generated: " . basename($path));
-                }
-                
-                $notifier->notify($diff);
+        // 4. Visual Reporting
+        $score = $diff->getHealthScore();
+        $color = $score > 90 ? 'green' : ($score > 70 ? 'yellow' : 'red');
+        $this->newLine();
+        $this->line("  <fg=white;bg=gray> Health Score: </><fg=white;bg={$color}> {$score}% </>");
+        
+        $this->renderReport($diff);
 
-                return 1; // Exit code 1 for CI if drift detected
+        // 5. Cleanup and Performance Reporting
+        $migrationTimes = $shadowRunner->getMigrationTimes();
+        $slowMigrations = array_filter($migrationTimes, fn($time) => $time > 1.0); // 1 second threshold
+
+        if (!empty($slowMigrations)) {
+            $this->newLine();
+            $this->components->warn("Performance Alert: " . count($slowMigrations) . " slow migrations detected!");
+            foreach ($slowMigrations as $file => $time) {
+                $this->line("  <fg=yellow>🐢</> <fg=cyan>{$file}</> took <fg=red>" . number_format($time, 2) . "s</>");
             }
-
-            // 6. Squash Advisor
-            $migrationFiles = \Illuminate\Support\Facades\File::files(database_path('migrations'));
-            if (count($migrationFiles) > 100) {
-                $this->newLine();
-                $this->components->warn("Performance Tip: You have " . count($migrationFiles) . " migrations. Consider squashing them to improve Sentinel speed.");
-                $this->line("    <fg=gray>Run: php artisan schema:dump</>");
-            }
-
-            return 0;
         }
+        $shadowRunner->cleanup();
+
+        if ($diff->hasDifferences()) {
+            if ($this->option('sql')) {
+                $this->newLine();
+                $this->components->info('Dry Run: Generated Migration Code');
+                $code = $generator->buildMigrationCode($diff, $this->option('interactive'));
+                $this->line("\n<fg=gray>/* --- Generated Migration --- */</>");
+                $this->line("<fg=green>{$code}</>");
+                $this->newLine();
+                return 0;
+            }
+
+            if ($this->option('fix')) {
+                $path = $generator->generate($diff, $this->option('interactive'));
+                $this->components->info("Migration generated: " . basename($path));
+            }
+            
+            $notifier->notify($diff);
+
+            return 1; // Exit code 1 for CI if drift detected
+        }
+
+        // 6. Squash Advisor
+        $migrationFiles = \Illuminate\Support\Facades\File::files(database_path('migrations'));
+        if (count($migrationFiles) > 100) {
+            $this->newLine();
+            $this->components->warn("Performance Tip: You have " . count($migrationFiles) . " migrations. Consider squashing them to improve Sentinel speed.");
+            $this->line("    <fg=gray>Run: php artisan schema:dump</>");
+        }
+
+        return 0;
     }
 
     /**
