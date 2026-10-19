@@ -228,15 +228,22 @@ class DiffEngine
 
         if (is_string($value)) {
             $trimmed = trim($value);
-            // Handle SQL quoted strings like 'active' or "active"
-            if ((str_starts_with($trimmed, "'") && str_ends_with($trimmed, "'")) ||
-                (str_starts_with($trimmed, '"') && str_ends_with($trimmed, '"'))) {
+            // Handle repeated SQL quoted strings like '''Guest''' or "'Guest'" from diverse dialects
+            while (
+                (str_starts_with($trimmed, "'") && str_ends_with($trimmed, "'") && strlen($trimmed) >= 2) ||
+                (str_starts_with($trimmed, '"') && str_ends_with($trimmed, '"') && strlen($trimmed) >= 2)
+            ) {
                 $trimmed = substr($trimmed, 1, -1);
             }
             // Strip casting syntax in Postgres defaults (e.g. 'draft'::character varying or false::boolean)
             if (str_contains($trimmed, '::')) {
                 $trimmed = explode('::', $trimmed)[0];
-                $trimmed = trim($trimmed, "'");
+                while (
+                    (str_starts_with($trimmed, "'") && str_ends_with($trimmed, "'") && strlen($trimmed) >= 2) ||
+                    (str_starts_with($trimmed, '"') && str_ends_with($trimmed, '"') && strlen($trimmed) >= 2)
+                ) {
+                    $trimmed = substr($trimmed, 1, -1);
+                }
             }
 
             if (strtolower($trimmed) === 'null') {

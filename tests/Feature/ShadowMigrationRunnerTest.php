@@ -56,4 +56,61 @@ class ShadowMigrationRunnerTest extends TestCase
 
         $runner->run();
     }
+
+    public function test_it_rejects_shadow_sqlite_targeting_same_live_file(): void
+    {
+        $liveFile = tempnam(sys_get_temp_dir(), 'live_db_');
+        $symlinkFile = sys_get_temp_dir() . '/symlink_live_db_' . uniqid() . '.sqlite';
+        symlink($liveFile, $symlinkFile);
+
+        try {
+            Config::set('database.default', 'sqlite_live');
+            Config::set('database.connections.sqlite_live', [
+                'driver' => 'sqlite',
+                'database' => $liveFile,
+            ]);
+
+            Config::set('schema-sentinel.shadow_connection', [
+                'driver' => 'sqlite',
+                'database' => $symlinkFile,
+            ]);
+
+            $runner = new ShadowMigrationRunner();
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('CRITICAL DATABASE SAFETY ERROR');
+
+            $runner->run();
+        } finally {
+            @unlink($symlinkFile);
+            @unlink($liveFile);
+        }
+    }
+
+    public function test_it_rejects_unsafe_sqlite_uri(): void
+    {
+        Config::set('schema-sentinel.shadow_connection', [
+            'driver' => 'sqlite',
+            'database' => 'file:/var/data/app.db?mode=ro',
+        ]);
+
+        $runner = new ShadowMigrationRunner();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unsafe SQLite database URI detected');
+
+        $runner->run();
+    }
+
+    public function test_it_rejects_missing_configured_migration_path(): void
+    {
+        Config::set('schema-sentinel.migration_paths', ['/path/that/does/not/exist/at/all']);
+
+        $runner = new ShadowMigrationRunner();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Configured migration path does not exist');
+
+        $runner->run();
+    }
 }

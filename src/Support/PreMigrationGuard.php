@@ -40,16 +40,18 @@ class PreMigrationGuard
         }
 
         // Avoid infinite recursion or blocking Sentinel internal commands
-        if (app()->runningInConsole() && str_contains(implode(' ', $_SERVER['argv'] ?? []), 'schema:')) {
+        $argvString = implode(' ', $_SERVER['argv'] ?? []);
+        if (app()->runningInConsole() && (str_contains($argvString, 'schema:') || str_contains($argvString, 'vendor:publish'))) {
             return;
         }
 
-        // Ensure Sentinel shadow simulation does not trigger the guard
+        // Track previous bypass state to ensure nested operations do not leak or reset incorrectly
+        $previousBypass = self::$bypassed;
         self::bypass(true);
         try {
             $diff = Sentinel::check();
         } finally {
-            self::bypass(false);
+            self::bypass($previousBypass);
         }
 
         if ($diff->hasDifferences()) {

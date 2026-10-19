@@ -18,18 +18,20 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-...................                                               19 / 19 (100%)
+...............SS..........                                       27 / 27 (100%)
 
-Time: 00:00.942, Memory: 14.00 MB
+Time: 00:00.914, Memory: 14.00 MB
 
-OK (19 tests, 61 assertions)
+OK, but some tests were skipped!
+Tests: 27, Assertions: 72, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
 | DiffEngine Analysis | 5 | 5 | 0 | 0 | **PASS** |
-| ShadowMigrationRunner Isolation | 2 | 2 | 0 | 0 | **PASS** |
+| ShadowMigrationRunner Isolation & Collision Safety | 4 | 4 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, Unsupported Types) | 3 | 3 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -37,7 +39,9 @@ OK (19 tests, 61 assertions)
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| **Total** | **19** | **19** | **0** | **0** | **100% PASS** |
+| PostgreSQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver) |
+| MySQL Integration Test | 1 | 0 | 0 | 1 | **SKIPPED** (Skipped when MySQL driver inactive) |
+| **Total** | **27** | **25** | **0** | **2** | **100% PASS** |
 
 ---
 

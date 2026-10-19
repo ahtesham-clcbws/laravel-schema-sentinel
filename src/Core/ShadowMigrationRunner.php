@@ -35,25 +35,24 @@ class ShadowMigrationRunner
         $createdPaths = [];
 
         try {
-            // Guard against recursion
+            // Guard against recursion while tracking previous bypass state
+            $previousBypass = PreMigrationGuard::isBypassed();
             PreMigrationGuard::bypass(true);
 
             // Temporarily set default connection to sentinel_shadow to ensure any
-            // unqualified DB queries in migrations target shadow, but DO NOT mutate other connection configs.
+            // unqualified DB queries in migrations target shadow.
             Config::set('database.default', self::CONNECTION_NAME);
             DB::setDefaultConnection(self::CONNECTION_NAME);
 
             $paths = Config::get('schema-sentinel.migration_paths', [\Illuminate\Support\Facades\App::databasePath('migrations')]);
             $skipMigrations = Config::get('schema-sentinel.skip_migrations', []);
 
+            $totalFilesMigrated = 0;
+
             foreach ($paths as $path) {
                 $runPath = $this->prepareMigrationPath($path, $skipMigrations, $tag);
                 if ($runPath !== $path && $runPath !== base_path($path)) {
                     $createdPaths[] = $runPath;
-                }
-
-                if (!is_dir($runPath)) {
-                    continue;
                 }
 
                 $files = array_diff(scandir($runPath) ?: [], ['.', '..']);
@@ -65,6 +64,8 @@ class ShadowMigrationRunner
                     }
 
                     $filePath = rtrim($runPath, '/') . '/' . $file;
+                    $this->validateMigrationConnectionSafety($filePath);
+
                     $start = microtime(true);
 
                     $exitCode = Artisan::call('migrate', [
@@ -80,6 +81,7 @@ class ShadowMigrationRunner
                     }
 
                     $this->migrationTimes[$file] = microtime(true) - $start;
+                    $totalFilesMigrated++;
 
                     if ($testRollback) {
                         $rbExit = Artisan::call('migrate:rollback', [
@@ -120,7 +122,8 @@ class ShadowMigrationRunner
                 $this->cleanupTemporaryPath($tempDir);
             }
 
-            PreMigrationGuard::bypass(false);
+            // Restore previous bypass state instead of blindly setting false
+            PreMigrationGuard::bypass($previousBypass ?? false);
         }
 
         return DB::connection(self::CONNECTION_NAME);
@@ -129,6 +132,27 @@ class ShadowMigrationRunner
     public function getMigrationTimes(): array
     {
         return $this->migrationTimes;
+    }
+
+    /**
+     * Inspect migration file source to detect dangerous explicit connection overrides.
+     */
+    protected function validateMigrationConnectionSafety(string $filePath): void
+    {
+        $code = file_get_contents($filePath);
+        if ($code === false) {
+            return;
+        }
+
+        // Detect patterns like DB::connection('mysql') or Schema::connection('production')
+        if (preg_match("/(?:DB|Schema)::connection\(\s*['\"]([^'\"]+)['\"]\s*\)/i", $code, $matches)) {
+            $connName = $matches[1];
+            if ($connName !== self::CONNECTION_NAME) {
+                throw new RuntimeException(
+                    "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] explicitly specifies database connection ['{$connName}']. Shadow simulation cannot safely isolate explicit connection calls without risking mutations to live databases."
+                );
+            }
+        }
     }
 
     /**
@@ -156,25 +180,95 @@ class ShadowMigrationRunner
     {
         $driver = $shadowConfig['driver'] ?? 'sqlite';
 
+        // Check against ALL configured connections in application
+        $configuredConnections = Config::get('database.connections', []);
+
         if ($driver === 'sqlite') {
-            $db = $shadowConfig['database'] ?? ':memory:';
-            // Allow :memory: or files located in system temp / storage
+            $db = (string) ($shadowConfig['database'] ?? ':memory:');
+
+            // Reject unsafe SQLite URI configurations (e.g. file:... mode=...)
+            if (str_starts_with($db, 'file:') || str_contains($db, '?')) {
+                throw new RuntimeException(
+                    "CRITICAL DATABASE SAFETY ERROR: Unsafe SQLite database URI detected in shadow connection [{$db}]. SQLite shadow must use ':memory:' or an explicit filesystem path."
+                );
+            }
+
+            if ($db === ':memory:' || $db === '') {
+                return;
+            }
+
+            // Resolve real filesystem paths for SQLite file
+            $shadowResolved = $this->resolvePath($db);
+
+            foreach ($configuredConnections as $name => $conn) {
+                if ($name === self::CONNECTION_NAME) {
+                    continue;
+                }
+                if (($conn['driver'] ?? '') === 'sqlite') {
+                    $liveDb = (string) ($conn['database'] ?? '');
+                    if ($liveDb !== '' && $liveDb !== ':memory:') {
+                        $liveResolved = $this->resolvePath($liveDb);
+                        if ($shadowResolved !== '' && $liveResolved !== '' && $shadowResolved === $liveResolved) {
+                            throw new RuntimeException(
+                                "CRITICAL DATABASE SAFETY ERROR: 'schema-sentinel.shadow_connection' SQLite file [{$db}] resolves to the same database file as your configured '{$name}' connection [{$liveDb}]. Shadow simulation must NEVER target a live database file."
+                            );
+                        }
+                    }
+                }
+            }
+
             return;
         }
 
-        // For client-server DBs (mysql, pgsql, etc.), verify it does not collide with the live default connection
-        $defaultConnName = Config::get('database.default');
-        $defaultConfig = Config::get("database.connections.{$defaultConnName}", []);
+        // For client-server DBs (mysql, pgsql, etc.), verify against all live configured connections
+        $shadowHost = strtolower((string) ($shadowConfig['host'] ?? 'localhost'));
+        $shadowPort = (string) ($shadowConfig['port'] ?? ($driver === 'pgsql' ? '5432' : '3306'));
+        $shadowDatabase = (string) ($shadowConfig['database'] ?? '');
+        $shadowSocket = (string) ($shadowConfig['unix_socket'] ?? '');
 
-        if (
-            ($shadowConfig['host'] ?? '') === ($defaultConfig['host'] ?? null) &&
-            ($shadowConfig['database'] ?? '') === ($defaultConfig['database'] ?? null) &&
-            !empty($shadowConfig['database'])
-        ) {
-            throw new RuntimeException(
-                "CRITICAL DATABASE SAFETY ERROR: 'schema-sentinel.shadow_connection' is configured with the same host and database as your live '{$defaultConnName}' connection [{$shadowConfig['database']}]. Shadow simulations must NEVER target a live database."
-            );
+        if ($shadowDatabase === '') {
+            throw new RuntimeException("CRITICAL DATABASE SAFETY ERROR: Shadow database name cannot be empty for driver [{$driver}].");
         }
+
+        foreach ($configuredConnections as $name => $conn) {
+            if ($name === self::CONNECTION_NAME) {
+                continue;
+            }
+
+            $liveDriver = $conn['driver'] ?? '';
+            if ($liveDriver !== $driver) {
+                continue;
+            }
+
+            $liveHost = strtolower((string) ($conn['host'] ?? 'localhost'));
+            $livePort = (string) ($conn['port'] ?? ($liveDriver === 'pgsql' ? '5432' : '3306'));
+            $liveDatabase = (string) ($conn['database'] ?? '');
+            $liveSocket = (string) ($conn['unix_socket'] ?? '');
+
+            // Normalize localhost variants
+            $isSameHost = ($shadowHost === $liveHost) ||
+                (in_array($shadowHost, ['127.0.0.1', 'localhost']) && in_array($liveHost, ['127.0.0.1', 'localhost']));
+
+            $isSamePort = ($shadowPort === $livePort);
+            $isSameDb = ($shadowDatabase === $liveDatabase);
+            $isSameSocket = ($shadowSocket !== '' && $shadowSocket === $liveSocket);
+
+            if ($isSameDb && ($isSameSocket || ($isSameHost && $isSamePort))) {
+                throw new RuntimeException(
+                    "CRITICAL DATABASE SAFETY ERROR: 'schema-sentinel.shadow_connection' [{$shadowDatabase}] collides with live connection '{$name}' [{$liveDatabase}] on host [{$shadowHost}:{$shadowPort}]. Shadow simulations must NEVER target a live database."
+                );
+            }
+        }
+    }
+
+    /**
+     * Resolve a path canonicalized for comparison.
+     */
+    protected function resolvePath(string $path): string
+    {
+        $absolute = str_starts_with($path, '/') ? $path : base_path($path);
+        $real = realpath($absolute);
+        return $real !== false ? $real : $absolute;
     }
 
     /**
@@ -184,8 +278,10 @@ class ShadowMigrationRunner
     {
         $absolutePath = str_starts_with($originalPath, '/') ? $originalPath : base_path($originalPath);
 
-        if (!is_dir($absolutePath)) {
-            return $originalPath;
+        if (!file_exists($absolutePath) || !is_dir($absolutePath)) {
+            throw new RuntimeException(
+                "Configured migration path does not exist or is not a directory: [{$originalPath}] (resolved to [{$absolutePath}])."
+            );
         }
 
         if (empty($skipMigrations) && empty($tag)) {
