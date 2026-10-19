@@ -6,6 +6,11 @@
 [![CI Tests](https://img.shields.io/github/actions/workflow/status/ahtesham-clcbws/laravel-schema-sentinel/ci.yml?branch=development&style=flat-square&label=tests)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions)
 [![License](https://img.shields.io/github/license/ahtesham-clcbws/laravel-schema-sentinel?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/blob/main/LICENSE)
 
+**Read this in:** **English** | [Roman Hindustani](README.hi-Latn.md) | [हिन्दी](README.hi.md) | [اردو](README.ur.md) | [العربية](README.ar.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md)
+
+> [!NOTE]
+> This English document is the canonical source of truth for Laravel Schema Sentinel. All translations are maintained in sync with this document.
+
 **Laravel Schema Sentinel** is a premium database schema integrity and governance suite. It detects and resolves "Schema Drift" (discrepancies between migration blueprints and the actual database state) and provides automated tools to standardize index configurations, audit content syncs, lint migration files, and reverse-engineer legacy tables.
 
 ---
