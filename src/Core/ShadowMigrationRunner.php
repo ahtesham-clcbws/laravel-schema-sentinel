@@ -34,29 +34,53 @@ class ShadowMigrationRunner
         $originalDefault = Config::get('database.default');
         $createdPaths = [];
 
+        $originalConnectionsConfig = Config::get('database.connections', []);
+        $lockedDriver = 'sentinel_locked_' . uniqid();
+
         try {
             // Guard against recursion while tracking previous bypass state
             $previousBypass = PreMigrationGuard::isBypassed();
-            $attachedInterceptors = [];
-            $interceptorClosure = function ($query, $bindings, $connection) {
-                $name = $connection->getName();
-                if ($name !== self::CONNECTION_NAME) {
-                    throw new RuntimeException(
-                        "CRITICAL DATABASE SAFETY VIOLATION: Migration attempted executing query on live/non-shadow connection ['{$name}'] during shadow simulation! Query: [{$query}]."
-                    );
-                }
-            };
 
-            // Attach runtime safety interceptor to all currently resolved database connections
+            // Register a custom locked driver with Laravel's DatabaseManager.
+            // Any attempt to resolve any non-shadow connection (directly, indirectly, or dynamically)
+            // will instantiate an inert in-memory SQLite connection whose queries immediately abort
+            // before any network/socket operation can reach a live database.
             $dbManager = DB::getFacadeRoot();
             if ($dbManager instanceof \Illuminate\Database\DatabaseManager) {
-                foreach ($dbManager->getConnections() as $name => $activeConn) {
-                    if ($name !== self::CONNECTION_NAME && $activeConn instanceof \Illuminate\Database\Connection) {
-                        $activeConn->beforeExecuting($interceptorClosure);
-                        $attachedInterceptors[$name] = $activeConn;
+                $dbManager->extend($lockedDriver, function ($config, $name) {
+                    $conn = new \Illuminate\Database\SQLiteConnection(new \PDO('sqlite::memory:'), ':memory:', '', ['name' => $name]);
+                    $conn->beforeExecuting(function ($query, $bindings, $c) use ($name) {
+                        throw new RuntimeException(
+                            "CRITICAL DATABASE SAFETY VIOLATION: Migration attempted executing query on non-shadow connection ['{$name}'] during shadow simulation! Query: [{$query}]."
+                        );
+                    });
+                    return $conn;
+                });
+            }
+
+            // Disconnect and purge all existing live connections
+            foreach (array_keys($originalConnectionsConfig) as $connName) {
+                if ($connName !== self::CONNECTION_NAME) {
+                    try {
+                        DB::disconnect($connName);
+                        DB::purge($connName);
+                    } catch (\Throwable) {
+                        // Ignore disconnect failures on uninitialized connections
                     }
                 }
             }
+
+            // Cloak all non-shadow configured connections to use the locked driver
+            $cloakedConnections = $originalConnectionsConfig;
+            foreach ($cloakedConnections as $connName => $connConfig) {
+                if ($connName !== self::CONNECTION_NAME) {
+                    $cloakedConnections[$connName] = [
+                        'driver' => $lockedDriver,
+                        'name' => $connName,
+                    ];
+                }
+            }
+            Config::set('database.connections', $cloakedConnections);
 
             PreMigrationGuard::bypass(true);
 
@@ -86,16 +110,6 @@ class ShadowMigrationRunner
 
                     $filePath = rtrim($runPath, '/') . '/' . $file;
                     $this->validateMigrationConnectionSafety($filePath);
-
-                    // Re-scan active connections in case new ones were resolved
-                    if ($dbManager instanceof \Illuminate\Database\DatabaseManager) {
-                        foreach ($dbManager->getConnections() as $name => $activeConn) {
-                            if ($name !== self::CONNECTION_NAME && !isset($attachedInterceptors[$name]) && $activeConn instanceof \Illuminate\Database\Connection) {
-                                $activeConn->beforeExecuting($interceptorClosure);
-                                $attachedInterceptors[$name] = $activeConn;
-                            }
-                        }
-                    }
 
                     $start = microtime(true);
 
@@ -142,18 +156,18 @@ class ShadowMigrationRunner
                 }
             }
         } finally {
-            // Detach runtime query interceptors
-            foreach ($attachedInterceptors as $conn) {
-                try {
-                    $ref = new \ReflectionProperty(\Illuminate\Database\Connection::class, 'beforeExecutingCallbacks');
-                    $ref->setAccessible(true);
-                    $cbs = $ref->getValue($conn);
-                    if (is_array($cbs)) {
-                        $cbs = array_values(array_filter($cbs, fn($cb) => $cb !== $interceptorClosure));
-                        $ref->setValue($conn, $cbs);
+            // Restore original connections configuration cleanly without reflection hacks
+            Config::set('database.connections', $originalConnectionsConfig);
+
+            // Purge any temporary dummy connections created during migration execution
+            foreach (array_keys($originalConnectionsConfig) as $connName) {
+                if ($connName !== self::CONNECTION_NAME) {
+                    try {
+                        DB::disconnect($connName);
+                        DB::purge($connName);
+                    } catch (\Throwable) {
+                        // Ignore purge errors during teardown
                     }
-                } catch (\Throwable) {
-                    // Ignore reflection teardown issues
                 }
             }
 

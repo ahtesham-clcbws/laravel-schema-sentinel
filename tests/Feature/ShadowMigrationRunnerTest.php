@@ -217,4 +217,40 @@ return new class extends Migration {
 
         $runner->run();
     }
+
+    public function test_it_cloaks_and_intercepts_dynamically_resolved_connections_during_simulation(): void
+    {
+        // Configure a mock live connection that would otherwise be reachable
+        Config::set('database.connections.remote_warehouse', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+        ]);
+
+        $tempDir = storage_path('framework/testing/test_cloak_conn_' . uniqid());
+        File::ensureDirectoryExists($tempDir);
+        $migrationFile = $tempDir . '/2026_01_01_000000_cloak_connection.php';
+        // Simulates indirect execution (e.g. third-party repository/helper accessing live connection without literal token)
+        file_put_contents($migrationFile, "<?php
+use Illuminate\\Database\\Migrations\\Migration;
+return new class extends Migration {
+    public function up(): void {
+        \$db = app('db');
+        \$connName = base64_decode('cmVtb3RlX3dhcmVob3VzZQ=='); // 'remote_warehouse'
+        \$fn = 'connec' . 'tion';
+        \$conn = \$db->\$fn(\$connName);
+        \$conn->select('SELECT 1');
+    }
+};");
+
+        Config::set('schema-sentinel.migration_paths', [$tempDir]);
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage("CRITICAL DATABASE SAFETY VIOLATION: Migration attempted executing query on non-shadow connection ['remote_warehouse']");
+            $runner->run();
+        } finally {
+            File::deleteDirectory($tempDir);
+        }
+    }
 }
