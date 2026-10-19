@@ -296,7 +296,7 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ## 📄 Registro de Cambios
 
-### Próxima Versión: v2.1.0 (En Revisión Final)
+### Versión: v2.1.0 (Release: v2.1.0)
 
 *   **Aislamiento de la Conexión Sombra**: Blindaje de `ShadowMigrationRunner` para evitar mutaciones de la conexión global, con verificación estricta de identidad para prevenir ejecuciones en bases vivas.
 *   **Protección Previa a Migraciones**: Reemplazo de la salida forzada `exit(1)` por `MigrationBlockedException`, incorporando un mecanismo determinista de omisión interna contra bloqueos en suites de prueba.

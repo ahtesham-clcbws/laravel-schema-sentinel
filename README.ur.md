@@ -293,7 +293,7 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ## 📄 تبدیلیوں کی تفصیل (Changelogs)
 
-### عنقریب ریلیز ہونے والا ورژن: v2.1.0 (زیرِ جائزہ / Under Final Review)
+### ورژن: v2.1.0 (Release: v2.1.0)
 
 *   **شیڈو کنکشن کا تحفظ**: `ShadowMigrationRunner` کو لائیو ڈیٹا بیس سے مکمل طور پر محفوظ اور الگ تھلگ بنایا گیا۔
 *   **پری مائیگریشن گارڈ**: رن ٹائم `exit(1)` کو ختم کر کے محفوظ ایکسیپشن `MigrationBlockedException` میں بدلا گیا۔

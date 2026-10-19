@@ -296,7 +296,7 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ## 📄 Registro de Alterações
 
-### Próxima Versão: v2.1.0 (Em Revisão Final)
+### Versão: v2.1.0 (Release: v2.1.0)
 
 *   **Isolamento de Migrations no Banco Sombra**: Blindagem do `ShadowMigrationRunner` para impedir a mutação da conexão global; adição de verificações rigorosas de identidade prevenindo execuções acidentais em conexões ativas.
 *   **Guarda Pré-Migração**: Substituição de chamadas `exit(1)` por `MigrationBlockedException` e implementação de bypass interno determinístico para prevenir reentrâncias e falhas em testes.
