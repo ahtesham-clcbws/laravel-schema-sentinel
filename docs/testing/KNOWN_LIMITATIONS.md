@@ -12,11 +12,14 @@ This document outlines intentional architectural boundaries, driver discrepancie
   - Client-server shadow connections are inspected against all configured connections (driver, host, port, database, and socket). Any identity match aborts immediately with a `RuntimeException`.
   - Unsafe SQLite URI configurations containing query flags (e.g., `file:... ?mode=...`) are explicitly rejected to prevent URI exploitation.
 
-## 2. Explicit Database Connections in Migrations
+## 2. Explicit Database Connections in Migrations & Arbitrary PHP Boundary
 
-- **Strict Isolation Policy**:
-  - Migrations declaring hardcoded connection calls such as `DB::connection('mysql')` or `Schema::connection('other')` bypass Laravel's default connection switching mechanism.
-  - To prevent accidental writes to live databases, `ShadowMigrationRunner` scans migration files during simulation. If an explicit connection override is detected, execution is aborted with an actionable `RuntimeException`, preventing un-isolated execution.
+- **Two-Tier Isolation & Cloaking Policy**:
+  - Migrations declaring hardcoded connection calls such as `DB::connection('mysql')`, `Schema::connection('other')`, or model class definitions with `protected $connection = '...'` bypass standard connection redirection.
+  - **Tier 1 (AST Static Validation)**: `ShadowMigrationRunner` scans migration files using AST tokens. Any explicit or dynamic connection override call triggers an immediate `RuntimeException`.
+  - **Tier 2 (Dynamic Runtime Locked Driver Extension)**: Prior to running migrations, all configured non-shadow database connections in the application are purged and re-registered to an inert in-memory SQLite connection powered by a custom locked driver (`sentinel_locked_*`). If any migration code or third-party package attempts to resolve or execute a query on any non-shadow connection (e.g., dynamically or via reflection), the query listener instantly terminates execution with `CRITICAL DATABASE SAFETY VIOLATION` before any packet reaches a live socket.
+- **Enforced Security Boundary for Arbitrary PHP**:
+  - Migrations are executable PHP code. While Sentinel enforces connection cloaking and token validation against Laravel database access, Sentinel does NOT attempt to isolate arbitrary OS-level system calls (`exec`, `shell_exec`, `proc_open`), direct raw `new \PDO()` network connections, or external filesystem mutations. Untrusted migration code requiring full OS-level sandboxing must be executed in isolated containers or dedicated virtual machines. Sentinel fails closed whenever safe execution cannot be established.
 
 ## 3. Migration Generator & Reverse Repairs
 
