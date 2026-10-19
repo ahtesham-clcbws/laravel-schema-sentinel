@@ -55,27 +55,46 @@ class SnapshotManager
     {
         $schema = [];
         foreach ($data as $tableName => $tableData) {
-            $table = new \Sentinel\SchemaSentinel\DTOs\TableDefinition($tableName);
-            
+            $columns = [];
             foreach ($tableData['columns'] as $colName => $c) {
-                $table->columns[$colName] = new \Sentinel\SchemaSentinel\DTOs\ColumnDefinition(
-                    $c['name'], $c['type'], $c['nullable'], $c['default']
+                $columns[$colName] = new \Sentinel\SchemaSentinel\DTOs\ColumnDefinition(
+                    $c['name'],
+                    $c['type'],
+                    $c['nullable'],
+                    $c['default'],
+                    $c['length'] ?? null,
+                    $c['unsigned'] ?? false,
+                    $c['comment'] ?? null
                 );
             }
 
+            $indexes = [];
             foreach ($tableData['indexes'] as $idxName => $i) {
-                $table->indexes[$idxName] = new \Sentinel\SchemaSentinel\DTOs\IndexDefinition(
-                    $i['name'], $i['columns'], $i['type']
+                $indexes[$idxName] = new \Sentinel\SchemaSentinel\DTOs\IndexDefinition(
+                    $i['name'],
+                    $i['type'],
+                    $i['columns']
                 );
             }
 
+            $foreignKeys = [];
             foreach ($tableData['foreignKeys'] as $fkName => $f) {
-                $table->foreignKeys[$fkName] = new \Sentinel\SchemaSentinel\DTOs\ForeignKeyDefinition(
-                    $f['name'], $f['columns'], $f['foreignTable'], $f['foreignColumns'], $f['onUpdate'], $f['onDelete']
+                $foreignKeys[$fkName] = new \Sentinel\SchemaSentinel\DTOs\ForeignKeyDefinition(
+                    $f['name'],
+                    $f['columns'],
+                    $f['foreignTable'],
+                    $f['foreignColumns'],
+                    $f['onDelete'] ?? 'no action',
+                    $f['onUpdate'] ?? 'no action'
                 );
             }
 
-            $schema[$tableName] = $table;
+            $schema[$tableName] = new \Sentinel\SchemaSentinel\DTOs\TableDefinition(
+                $tableName,
+                $columns,
+                $indexes,
+                $foreignKeys
+            );
         }
 
         return $schema;

@@ -319,25 +319,7 @@ PHP;
         $seederName = Str::studly($tableName) . "TableSeeder";
         $dir = "{$basePath}/database/seeders";
 
-        $rows = [];
-        try {
-            $rows = DB::table($tableName)->limit(5)->get()->map(fn($r) => (array) $r)->toArray();
-        } catch (\Exception $e) {
-            // Table doesn't exist yet
-        }
-
-        $rowsCode = "";
-        if (!empty($rows)) {
-            $rowsCode .= "        DB::table('{$tableName}')->insert([\n";
-            foreach ($rows as $row) {
-                $rowFormatted = var_export($row, true);
-                $rowFormatted = str_replace("\n", "\n            ", $rowFormatted);
-                $rowsCode .= "            {$rowFormatted},\n";
-            }
-            $rowsCode .= "        ]);\n";
-        } else {
-            $rowsCode .= "        // Seed data here\n";
-        }
+        $rowsCode = "        // Seed dummy data or model factories here\n";
 
         $template = <<<PHP
 <?php

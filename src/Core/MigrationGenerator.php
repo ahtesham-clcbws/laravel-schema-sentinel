@@ -50,8 +50,9 @@ class MigrationGenerator
             if ($interactive && !$command->confirm("Create missing table [$tableName]?", true)) {
                 continue;
             }
-            $up[] = $this->buildCreateTableCode($table);
-            $down[] = "Schema::dropIfExists('{$tableName}');";
+            $tableLiteral = var_export($tableName, true);
+            $up[] = "if (!Schema::hasTable({$tableLiteral})) {\n            " . $this->buildCreateTableCode($table) . "\n        }";
+            $down[] = "Schema::dropIfExists({$tableLiteral});";
         }
 
         // 2. Missing Columns Logic
@@ -61,8 +62,10 @@ class MigrationGenerator
             if ($interactive && !$command->confirm("Add columns [$colNames] to table [$tableName]?", true)) {
                 continue;
             }
+            $tableLiteral = var_export($tableName, true);
             $up[] = $this->buildAddColumnsCode($tableName, $columns);
-            $down[] = "Schema::table('$tableName', function (Blueprint \$table) {\n            \$table->dropColumn([" . implode(', ', array_map(fn($c) => "'{$c['column']->name}'", $columns)) . "]);\n        });";
+            $colsArrayLiteral = var_export(array_map(fn($c) => $c['column']->name, $columns), true);
+            $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) {\n            \$table->dropColumn({$colsArrayLiteral});\n        });";
         }
 
         // 3. Mismatched Columns Logic
@@ -73,7 +76,7 @@ class MigrationGenerator
                 continue;
             }
             $up[] = $this->buildChangeColumnsCode($tableName, $mismatches);
-            $down[] = "// Manual rollback required for column changes in table [$tableName]";
+            $down[] = $this->buildRollbackChangeColumnsCode($tableName, $mismatches);
         }
 
         // 4. Missing Indexes Logic
@@ -82,9 +85,17 @@ class MigrationGenerator
             if ($interactive && !$command->confirm("Add indexes to table [$tableName]?", true)) {
                 continue;
             }
+            $tableLiteral = var_export($tableName, true);
             $up[] = $this->buildAddIndexesCode($tableName, $indexes);
             foreach ($indexes as $idx) {
-                $down[] = "Schema::table('$tableName', function (Blueprint \$table) { \$table->dropIndex('{$idx['index']->name}'); });";
+                $idxNameLiteral = var_export($idx['index']->name, true);
+                if ($idx['index']->type === 'primary') {
+                    $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) { \$table->dropPrimary(); });";
+                } elseif ($idx['index']->type === 'unique') {
+                    $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) { \$table->dropUnique({$idxNameLiteral}); });";
+                } else {
+                    $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) { \$table->dropIndex({$idxNameLiteral}); });";
+                }
             }
         }
 
@@ -94,9 +105,11 @@ class MigrationGenerator
             if ($interactive && !$command->confirm("Add foreign keys to table [$tableName]?", true)) {
                 continue;
             }
+            $tableLiteral = var_export($tableName, true);
             $up[] = $this->buildAddForeignKeysCode($tableName, $fks);
             foreach ($fks as $fk) {
-                $down[] = "Schema::table('$tableName', function (Blueprint \$table) { \$table->dropForeign('{$fk['fk']->name}'); });";
+                $fkNameLiteral = var_export($fk['fk']->name, true);
+                $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) { \$table->dropForeign({$fkNameLiteral}); });";
             }
         }
 
@@ -150,9 +163,33 @@ PHP;
 
     protected function buildCreateTableCode($table): string
     {
-        $lines = ["Schema::create('{$table->name}', function (Blueprint \$table) {"];
+        $tableLiteral = var_export($table->name, true);
+        $lines = ["Schema::create({$tableLiteral}, function (Blueprint \$table) {"];
         foreach ($table->columns as $col) {
             $lines[] = "            " . $this->columnToBlueprint($col) . ";";
+        }
+        if (!empty($table->indexes)) {
+            foreach ($table->indexes as $idx) {
+                $colsLiteral = var_export($idx->columns, true);
+                $nameLiteral = var_export($idx->name, true);
+                if ($idx->type === 'primary') {
+                    $lines[] = "            \$table->primary({$colsLiteral});";
+                } elseif (in_array($idx->type, ['unique', 'index', 'spatial', 'fulltext'])) {
+                    $lines[] = "            \$table->{$idx->type}({$colsLiteral}, {$nameLiteral});";
+                }
+            }
+        }
+        if (!empty($table->foreignKeys)) {
+            foreach ($table->foreignKeys as $fk) {
+                $colsLiteral = var_export($fk->columns, true);
+                $fColsLiteral = var_export($fk->foreignColumns, true);
+                $nameLiteral = var_export($fk->name, true);
+                $fTableLiteral = var_export($fk->foreignTable, true);
+                $onDeleteLiteral = var_export($fk->onDelete, true);
+                $onUpdateLiteral = var_export($fk->onUpdate, true);
+
+                $lines[] = "            \$table->foreign({$colsLiteral}, {$nameLiteral})\n                  ->references({$fColsLiteral})->on({$fTableLiteral})\n                  ->onDelete({$onDeleteLiteral})->onUpdate({$onUpdateLiteral});";
+            }
         }
         $lines[] = "        });";
         return implode("\n", $lines);
@@ -160,7 +197,8 @@ PHP;
 
     protected function buildAddColumnsCode(string $tableName, array $columns): string
     {
-        $lines = ["Schema::table('$tableName', function (Blueprint \$table) {"];
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
         foreach ($columns as $item) {
             $lines[] = "            " . $this->columnToBlueprint($item['column']) . ";";
         }
@@ -170,7 +208,8 @@ PHP;
 
     protected function buildChangeColumnsCode(string $tableName, array $mismatches): string
     {
-        $lines = ["Schema::table('$tableName', function (Blueprint \$table) {"];
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
         foreach ($mismatches as $item) {
             $lines[] = "            " . $this->columnToBlueprint($item['ideal']) . "->change();";
         }
@@ -178,13 +217,30 @@ PHP;
         return implode("\n", $lines);
     }
 
+    protected function buildRollbackChangeColumnsCode(string $tableName, array $mismatches): string
+    {
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
+        foreach ($mismatches as $item) {
+            $lines[] = "            " . $this->columnToBlueprint($item['live']) . "->change();";
+        }
+        $lines[] = "        });";
+        return implode("\n", $lines);
+    }
+
     protected function buildAddIndexesCode(string $tableName, array $indexes): string
     {
-        $lines = ["Schema::table('$tableName', function (Blueprint \$table) {"];
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
         foreach ($indexes as $item) {
             $idx = $item['index'];
-            $cols = "['" . implode("', '", $idx->columns) . "']";
-            $lines[] = "            \$table->{$idx->type}($cols, '{$idx->name}');";
+            $colsLiteral = var_export($idx->columns, true);
+            $nameLiteral = var_export($idx->name, true);
+            if ($idx->type === 'primary') {
+                $lines[] = "            \$table->primary({$colsLiteral});";
+            } else {
+                $lines[] = "            \$table->{$idx->type}({$colsLiteral}, {$nameLiteral});";
+            }
         }
         $lines[] = "        });";
         return implode("\n", $lines);
@@ -192,12 +248,18 @@ PHP;
 
     protected function buildAddForeignKeysCode(string $tableName, array $fks): string
     {
-        $lines = ["Schema::table('$tableName', function (Blueprint \$table) {"];
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
         foreach ($fks as $item) {
             $fk = $item['fk'];
-            $cols = "['" . implode("', '", $fk->columns) . "']";
-            $fCols = "['" . implode("', '", $fk->foreignColumns) . "']";
-            $lines[] = "            \$table->foreign($cols, '{$fk->name}')\n                  ->references($fCols)->on('{$fk->foreignTable}')\n                  ->onDelete('{$fk->onDelete}')->onUpdate('{$fk->onUpdate}');";
+            $colsLiteral = var_export($fk->columns, true);
+            $fColsLiteral = var_export($fk->foreignColumns, true);
+            $nameLiteral = var_export($fk->name, true);
+            $fTableLiteral = var_export($fk->foreignTable, true);
+            $onDeleteLiteral = var_export($fk->onDelete, true);
+            $onUpdateLiteral = var_export($fk->onUpdate, true);
+
+            $lines[] = "            \$table->foreign({$colsLiteral}, {$nameLiteral})\n                  ->references({$fColsLiteral})->on({$fTableLiteral})\n                  ->onDelete({$onDeleteLiteral})->onUpdate({$onUpdateLiteral});";
         }
         $lines[] = "        });";
         return implode("\n", $lines);
@@ -206,12 +268,37 @@ PHP;
     protected function columnToBlueprint($col): string
     {
         $method = $this->mapTypeToMethod($col->type);
-        $code = "\$table->{$method}('{$col->name}')";
+        $nameLiteral = var_export($col->name, true);
 
-        if ($col->nullable) { $code .= "->nullable()"; }
+        if ($col->length !== null && in_array($method, ['string', 'char'])) {
+            $code = "\$table->{$method}({$nameLiteral}, {$col->length})";
+        } else {
+            $code = "\$table->{$method}({$nameLiteral})";
+        }
+
+        if ($col->unsigned && in_array($method, ['integer', 'bigInteger', 'smallInteger', 'tinyInteger', 'mediumInteger'])) {
+            $code .= "->unsigned()";
+        }
+
+        if ($col->nullable) {
+            $code .= "->nullable()";
+        }
+
         if ($col->default !== null) {
-            $default = is_string($col->default) ? "'{$col->default}'" : $col->default;
-            $code .= "->default({$default})";
+            $normalizedDefault = is_string($col->default) ? trim($col->default, "'\" \t\n\r\0\x0B") : $col->default;
+            if (is_string($normalizedDefault) && strtolower($normalizedDefault) === 'null') {
+                if (!$col->nullable) {
+                    $code .= "->nullable()";
+                }
+            } else {
+                $defaultLiteral = var_export($col->default, true);
+                $code .= "->default({$defaultLiteral})";
+            }
+        }
+
+        if (!empty($col->comment)) {
+            $commentLiteral = var_export($col->comment, true);
+            $code .= "->comment({$commentLiteral})";
         }
 
         return $code;
@@ -219,7 +306,14 @@ PHP;
 
     protected function mapTypeToMethod(string $type): string
     {
-        $type = strtolower($type);
+        $rawType = trim($type);
+        $type = strtolower($rawType);
+
+        // Strip length/precision if present
+        if (preg_match('/^([a-z_]+)\s*\(/i', $type, $matches)) {
+            $type = $matches[1];
+        }
+
         $custom = config('schema-sentinel.custom_types', []);
 
         if (isset($custom[$type])) {
@@ -227,26 +321,27 @@ PHP;
         }
 
         return match ($type) {
-            'integer', 'int' => 'integer',
-            'bigint' => 'bigInteger',
-            'tinyint' => 'tinyInteger',
-            'smallint' => 'smallInteger',
+            'integer', 'int', 'int4' => 'integer',
+            'bigint', 'int8', 'bigserial' => 'bigInteger',
+            'smallint', 'int2' => 'smallInteger',
             'mediumint' => 'mediumInteger',
-            'string', 'varchar' => 'string',
-            'text', 'longtext', 'mediumtext' => 'text',
-            'boolean', 'bool' => 'boolean',
-            'timestamp' => 'timestamp',
-            'datetime' => 'dateTime',
+            'string', 'varchar', 'character varying', 'nvarchar' => 'string',
+            'char' => 'char',
+            'text', 'longtext', 'mediumtext', 'tinytext' => 'text',
+            'boolean', 'bool', 'tinyint' => 'boolean',
+            'timestamp', 'timestamptz' => 'timestamp',
+            'datetime', 'datetime2' => 'dateTime',
             'date' => 'date',
             'time' => 'time',
-            'decimal' => 'decimal',
-            'float' => 'float',
-            'double' => 'double',
+            'decimal', 'numeric' => 'decimal',
+            'float', 'float4', 'real' => 'float',
+            'double', 'float8' => 'double',
             'json', 'jsonb' => 'json',
             'uuid' => 'uuid',
             'ipaddress' => 'ipAddress',
             'macaddress' => 'macAddress',
-            default => 'string',
+            'binary', 'blob' => 'binary',
+            default => throw new \RuntimeException("Unsupported column type [{$rawType}] detected for repair migration generation."),
         };
     }
 }

@@ -1,8 +1,15 @@
 # Laravel Schema Sentinel
 
-[![Latest Version on GitHub](https://img.shields.io/github/v/release/ahtesham-clcbws/laravel-schema-sentinel?include_prereleases&style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/releases)
+[![Latest Stable Version](https://img.shields.io/packagist/v/clcbws/laravel-schema-sentinel?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
+[![GitHub Stars](https://img.shields.io/github/stars/ahtesham-clcbws/laravel-schema-sentinel?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/stargazers)
 [![Total Downloads](https://img.shields.io/packagist/dt/clcbws/laravel-schema-sentinel.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-schema-sentinel)
+[![CI Tests](https://img.shields.io/github/actions/workflow/status/ahtesham-clcbws/laravel-schema-sentinel/ci.yml?branch=development&style=flat-square&label=tests)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions)
 [![License](https://img.shields.io/github/license/ahtesham-clcbws/laravel-schema-sentinel?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/blob/main/LICENSE)
+
+**Read this in:** **English** | [Roman Hindustani](README.hi-Latn.md) | [हिन्दी](README.hi.md) | [اردو](README.ur.md) | [العربية](README.ar.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md)
+
+> [!NOTE]
+> This English document is the canonical source of truth for Laravel Schema Sentinel. All translations are maintained in sync with this document.
 
 **Laravel Schema Sentinel** is a premium database schema integrity and governance suite. It detects and resolves "Schema Drift" (discrepancies between migration blueprints and the actual database state) and provides automated tools to standardize index configurations, audit content syncs, lint migration files, and reverse-engineer legacy tables.
 
@@ -268,17 +275,34 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ---
 
+## 🛡️ Compatibility & Test Status
+
+- **Laravel Compatibility**: **Laravel 13.x ONLY** (Zero backward-compatibility shims for Laravel 10/11/12).
+- **Minimum PHP Version**: **PHP 8.4+** (Fully tested on PHP 8.4 and PHP 8.5).
+- **Verified Database Engines**:
+  - **SQLite**: 3.49+ (In-memory and file-based).
+  - **PostgreSQL**: 16+ / 18+ (Tested with dedicated shadow connection).
+  - **MySQL / MariaDB**: 8.0+ / 13.0+ (Tested in multi-service CI container matrix).
+- **Genuine Test Reports & Evidence**:
+  - [Test Matrix](docs/testing/TEST_MATRIX.md)
+  - [Real Application Test Results](docs/testing/TEST_RESULTS.md)
+  - [Known Limitations & Dialect Behavior](docs/testing/KNOWN_LIMITATIONS.md)
+  - [Performance Benchmarks](docs/testing/PERFORMANCE.md)
+
+---
+
 ## 📄 Changelogs
 
-### Latest Release: v2.0.0
+### Upcoming Release: v2.1.0 (Under Final Review)
 
-*   **Index Standardizer & Optimizer**: Detects duplicate indexes and enforces Laravel naming conventions.
-*   **Data Drift Engine**: Audits static data tables across different database connections.
-*   **Legacy Bridge Generator**: Reverse-engineers databases into modern migrations, models with relationships, seeders, and PHP 8.4 Backed Enums.
-*   **PHP 8.4 / Laravel 13 Alignment**: Full type-safety compliance, strict typing enabled file-wide, and console command attributes.
-*   **CLI Bug Fixes**: Corrected infinite loop retry states, docs property errors, and bigInt mappings.
+*   **Shadow Migration Isolation**: Hardened `ShadowMigrationRunner` to eliminate global connection mutation; added strict target identity checks preventing accidental runs on live connections.
+*   **Pre-Migration Guard**: Replaced runtime `exit(1)` with `MigrationBlockedException` and implemented deterministic internal bypass to prevent re-entrancy and test crashes.
+*   **DiffEngine & Type Normalization**: Resolved false positives across database engines for types (`varchar`, `bigint`, `boolean`), compound indexes, and foreign key action comparisons.
+*   **Migration Generator**: Fixed missing index and foreign key definitions in generated table creations, added `--realpath` support for Laravel 13, and added idempotency guards.
+*   **Data Safety**: Removed live database record dumping in generated seeders, removed dummy enum fabrication, and purged external telemetry network exfiltration.
+*   **Laravel 13 Ecosystem Validation**: Validated in fresh real Laravel 13 application and configured automated GitHub Actions matrix.
 
-For past version releases, see [changelogs/v1.0.0.md](changelogs/v1.0.0.md) and [changelogs/v1.6.0.md](changelogs/v1.6.0.md).
+For past version releases, see [changelogs/v2.0.0.md](changelogs/v2.0.0.md), [changelogs/v1.6.0.md](changelogs/v1.6.0.md), and [changelogs/v1.0.0.md](changelogs/v1.0.0.md).
 
 ---
 
