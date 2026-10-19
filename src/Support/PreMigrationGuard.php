@@ -6,32 +6,56 @@ namespace Sentinel\SchemaSentinel\Support;
 
 use Illuminate\Database\Events\MigrationsStarted;
 use Sentinel\SchemaSentinel\Facades\Sentinel;
-use Illuminate\Support\Facades\Artisan;
+use Sentinel\SchemaSentinel\Exceptions\MigrationBlockedException;
 
 /**
  * Prevents migrations from running if the database is in a drifted state.
  */
 class PreMigrationGuard
 {
+    /**
+     * Internal flag to deterministically bypass the guard during shadow simulations or explicit bypass.
+     */
+    protected static bool $bypassed = false;
+
+    public static function bypass(bool $state = true): void
+    {
+        self::$bypassed = $state;
+    }
+
+    public static function isBypassed(): bool
+    {
+        return self::$bypassed;
+    }
+
     public function handle(MigrationsStarted $event): void
     {
-        if (!config('schema-sentinel.guard.enabled')) {
+        if (!config('schema-sentinel.guard.enabled', false)) {
             return;
         }
 
-        // We skip the guard check if it's already a Sentinel shadow migration
-        // or if we are in the middle of a drift check to avoid infinite loops.
-        if (str_contains(request()->fullUrl() ?? '', 'sentinel') || app()->runningInConsole() && str_contains(implode(' ', $_SERVER['argv'] ?? []), 'schema:')) {
+        // Deterministic bypass during shadow simulation or when explicitly bypassed
+        if (self::$bypassed) {
             return;
         }
 
-        $diff = Sentinel::check();
+        // Avoid infinite recursion or blocking Sentinel internal commands
+        if (app()->runningInConsole() && str_contains(implode(' ', $_SERVER['argv'] ?? []), 'schema:')) {
+            return;
+        }
+
+        // Ensure Sentinel shadow simulation does not trigger the guard
+        self::bypass(true);
+        try {
+            $diff = Sentinel::check();
+        } finally {
+            self::bypass(false);
+        }
 
         if ($diff->hasDifferences()) {
-            echo "\n\033[41m ERROR \033[0m \033[31mSchema Drift Detected!\033[0m\n";
-            echo "Sentinel Guard has blocked this migration because your Live DB is out of sync.\n";
-            echo "Please run \033[36mphp artisan schema:drift\033[0m first.\n\n";
-            exit(1);
+            throw new MigrationBlockedException(
+                "Sentinel Guard blocked this migration: schema drift detected between migrations and the live database. Run 'php artisan schema:drift' to review."
+            );
         }
     }
 }

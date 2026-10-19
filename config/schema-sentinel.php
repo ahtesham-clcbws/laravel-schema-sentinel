@@ -18,8 +18,8 @@ return [
         'database' => env('SENTINEL_SHADOW_DB', ':memory:'),
         'username' => env('SENTINEL_SHADOW_USER', env('DB_USERNAME', 'forge')),
         'password' => env('SENTINEL_SHADOW_PASS', env('DB_PASSWORD', '')),
-        'charset'  => 'utf8mb4',
-        'collation' => 'utf8mb4_unicode_ci',
+        'charset'  => env('SENTINEL_SHADOW_CHARSET', env('SENTINEL_SHADOW_DRIVER') === 'pgsql' ? 'utf8' : 'utf8mb4'),
+        'collation' => env('SENTINEL_SHADOW_COLLATION', env('SENTINEL_SHADOW_DRIVER') === 'pgsql' ? null : 'utf8mb4_unicode_ci'),
         'prefix'   => '',
         'foreign_key_constraints' => env('SENTINEL_SHADOW_FK', false),
         /*

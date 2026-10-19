@@ -50,7 +50,7 @@ class MigrationGenerator
             if ($interactive && !$command->confirm("Create missing table [$tableName]?", true)) {
                 continue;
             }
-            $up[] = $this->buildCreateTableCode($table);
+            $up[] = "if (!Schema::hasTable('{$tableName}')) {\n            " . $this->buildCreateTableCode($table) . "\n        }";
             $down[] = "Schema::dropIfExists('{$tableName}');";
         }
 
@@ -153,6 +153,24 @@ PHP;
         $lines = ["Schema::create('{$table->name}', function (Blueprint \$table) {"];
         foreach ($table->columns as $col) {
             $lines[] = "            " . $this->columnToBlueprint($col) . ";";
+        }
+        if (!empty($table->indexes)) {
+            foreach ($table->indexes as $idx) {
+                if ($idx->type === 'primary') {
+                    $cols = "['" . implode("', '", $idx->columns) . "']";
+                    $lines[] = "            \$table->primary($cols);";
+                } elseif (in_array($idx->type, ['unique', 'index', 'spatial', 'fulltext'])) {
+                    $cols = "['" . implode("', '", $idx->columns) . "']";
+                    $lines[] = "            \$table->{$idx->type}($cols, '{$idx->name}');";
+                }
+            }
+        }
+        if (!empty($table->foreignKeys)) {
+            foreach ($table->foreignKeys as $fk) {
+                $cols = "['" . implode("', '", $fk->columns) . "']";
+                $fCols = "['" . implode("', '", $fk->foreignColumns) . "']";
+                $lines[] = "            \$table->foreign($cols, '{$fk->name}')\n                  ->references($fCols)->on('{$fk->foreignTable}')\n                  ->onDelete('{$fk->onDelete}')->onUpdate('{$fk->onUpdate}');";
+            }
         }
         $lines[] = "        });";
         return implode("\n", $lines);
