@@ -37,6 +37,11 @@ class ShadowMigrationRunner
         $originalConnectionsConfig = Config::get('database.connections', []);
         $lockedDriver = 'sentinel_locked_' . uniqid();
 
+        // Ensure no active database transaction exists on any open connection in the host process.
+        // Disconnecting or purging live connections during an active transaction would silently abort or corrupt
+        // that transaction state. In-process shadow simulation cannot run concurrently with an uncommitted transaction.
+        $this->ensureNoActiveTransactions();
+
         try {
             // Guard against recursion while tracking previous bypass state
             $previousBypass = PreMigrationGuard::isBypassed();
@@ -279,6 +284,45 @@ class ShadowMigrationRunner
                             "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] invokes external process execution function [{$funcName}()]. External system processes cannot be safely isolated during shadow simulation."
                         );
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Inspect all active database connections in the host process and abort if any connection has an active transaction.
+     */
+    protected function ensureNoActiveTransactions(): void
+    {
+        $dbManager = DB::getFacadeRoot();
+        if (!$dbManager instanceof \Illuminate\Database\DatabaseManager) {
+            return;
+        }
+
+        foreach ($dbManager->getConnections() as $name => $connection) {
+            if ($name === self::CONNECTION_NAME) {
+                continue;
+            }
+
+            if ($connection instanceof Connection) {
+                $level = $connection->transactionLevel();
+                $pdoInTx = false;
+
+                try {
+                    $pdo = $connection->getPdo();
+                    if ($pdo instanceof \PDO && $pdo->inTransaction()) {
+                        $pdoInTx = true;
+                    }
+                } catch (\Throwable) {
+                    // Ignore failure to resolve raw PDO
+                }
+
+                if ($level > 0 || $pdoInTx) {
+                    throw new RuntimeException(
+                        "CRITICAL DATABASE SAFETY ERROR: Active transaction detected on connection ['{$name}'] (transaction level: {$level}). " .
+                        "Running in-process shadow simulation would purge and disrupt active transactions in the host application. " .
+                        "Ensure all database transactions are committed or rolled back before invoking Sentinel."
+                    );
                 }
             }
         }

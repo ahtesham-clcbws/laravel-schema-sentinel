@@ -303,4 +303,42 @@ return new class extends Migration {
             File::deleteDirectory($tempDir);
         }
     }
+
+    public function test_it_rejects_shadow_simulation_when_active_transaction_exists_and_preserves_transaction(): void
+    {
+        // 1. Set up an active live connection with a table and open transaction
+        $conn = DB::connection('testing');
+        $conn->statement('CREATE TABLE test_tx_preservation (id INTEGER PRIMARY KEY, title TEXT)');
+        $conn->beginTransaction();
+        $conn->statement("INSERT INTO test_tx_preservation (title) VALUES ('before_sentinel')");
+
+        $this->assertSame(1, $conn->transactionLevel());
+
+        $runner = new ShadowMigrationRunner();
+
+        // 2. Attempting to run shadow simulation must throw RuntimeException aborting before purging/disconnecting
+        $exceptionCaught = false;
+        try {
+            $runner->run();
+        } catch (\RuntimeException $e) {
+            $exceptionCaught = true;
+            $this->assertStringContainsString('Active transaction detected on connection', $e->getMessage());
+            $this->assertStringContainsString('testing', $e->getMessage());
+        }
+
+        $this->assertTrue($exceptionCaught, 'Expected RuntimeException when running Sentinel during active transaction');
+
+        // 3. Verify the transaction and connection state remained intact
+        $this->assertSame(1, $conn->transactionLevel());
+        $count = $conn->table('test_tx_preservation')->count();
+        $this->assertSame(1, $count);
+
+        // 4. Commit the transaction and verify persistence
+        $conn->commit();
+        $this->assertSame(0, $conn->transactionLevel());
+        $this->assertSame(1, $conn->table('test_tx_preservation')->count());
+
+        // Cleanup
+        $conn->statement('DROP TABLE test_tx_preservation');
+    }
 }

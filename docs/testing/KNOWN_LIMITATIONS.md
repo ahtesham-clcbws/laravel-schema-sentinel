@@ -24,9 +24,10 @@ This document outlines intentional architectural boundaries, driver discrepancie
   - **What IS NOT Protected (Host-Process Boundaries)**:
     - **Arbitrary PHP / External Libraries**: If a migration invokes third-party code that connects to external databases via raw sockets, C extensions, non-standard PDO wrappers outside Laravel, or arbitrary file/network calls, the in-process locked driver cannot sandbox them at the OS kernel level.
     - **Untrusted Migrations**: Sentinel does NOT provide OS-level containerization or process virtualization. For untrusted third-party migrations, execution must be performed in dedicated throwaway virtual machines or Docker containers with network access disabled.
-- **Connection Purging & Lifecycle Side Effects**:
-  - To implement runtime cloaking, `ShadowMigrationRunner` executes `DB::disconnect()` and `DB::purge()` on all active non-shadow connections before running migrations, and restores the original connection configurations in a `finally` block.
-  - **Side Effect**: Any previously opened PDO connections or in-progress transactions on live connections in the host process are purged. Long-running worker processes or scripts that hold stateful live database transactions must not invoke `Sentinel::diff()` or `schema:drift` concurrently within the same transaction lifecycle.
+- **Active Transaction Interlock & Connection Purging Safety**:
+  - To prevent state disruption in the host process, `ShadowMigrationRunner` inspects all initialized database connections in `DatabaseManager` before performing any connection modifications.
+  - **Transaction Protection**: If any connection has an active transaction (`transactionLevel() > 0` or PDO `inTransaction() === true`), Sentinel immediately aborts with `CRITICAL DATABASE SAFETY ERROR: Active transaction detected on connection [...]`. This prevents Sentinel from purging connections mid-transaction, ensuring all pending transaction states in the host application remain 100% intact.
+  - **Post-Simulation Cleanup**: When no active transaction is present, connections are purged, cloaked during simulation, and restored cleanly in a `finally` block.
 
 ## 3. Migration Generator & Reverse Repairs
 
