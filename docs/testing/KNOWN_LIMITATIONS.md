@@ -1,4 +1,4 @@
-# Known Limitations & Engine Constraints — Laravel Schema Sentinel v2.0.1
+# Known Limitations & Engine Constraints — Laravel Schema Sentinel v2.1.0
 
 This document outlines intentional architectural boundaries, driver discrepancies, and unsupported scenarios.
 
@@ -15,9 +15,9 @@ This document outlines intentional architectural boundaries, driver discrepancie
 - **Enum Reflection**:
   - Pure SQLite does not enforce native ENUM types; column types are stored as `varchar` or `text`. Reverse engineering generates class scaffolds without fabricating imaginary business states.
 - **Data Seeder Sanitization**:
-  - In v2.0.1, automated live record export in seeders has been removed to prevent sensitive data leakage. Generated seeders contain standard developer placeholder comments.
+  - In v2.1.0, automated live record export in seeders has been removed to prevent sensitive data leakage. Generated seeders contain standard developer placeholder comments.
 
 ## 3. Pre-Migration Guard Context
 
 - **Event Exception Behavior**:
-  - In previous versions, `PreMigrationGuard` invoked `exit(1)` abruptly. In v2.0.1, it throws `Sentinel\SchemaSentinel\Exceptions\MigrationBlockedException`, allowing host testing runners or CLI handlers to trap and report the event cleanly.
+  - In previous versions, `PreMigrationGuard` invoked `exit(1)` abruptly. In v2.1.0, it throws `Sentinel\SchemaSentinel\Exceptions\MigrationBlockedException`, allowing host testing runners or CLI handlers to trap and report the event cleanly.

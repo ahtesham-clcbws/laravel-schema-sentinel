@@ -1,4 +1,4 @@
-# Performance Benchmarks — Laravel Schema Sentinel v2.0.1
+# Performance Benchmarks — Laravel Schema Sentinel v2.1.0
 
 All benchmarks were measured on Arch Linux (CachyOS x86_64, 2-core CPU / 32GB RAM, PHP 8.5.11, Laravel 13.37.0).
 

@@ -7,7 +7,7 @@ namespace Sentinel\SchemaSentinel\Support;
 /**
  * Diagnostic and environment helper.
  * 
- * In v2.0.1, external telemetry exfiltration is completely removed.
+ * In v2.1.0, external telemetry exfiltration is completely removed.
  * This class remains strictly local for diagnostic reporting.
  */
 class Telemetry
@@ -19,7 +19,7 @@ class Telemetry
     {
         return [
             'package_name' => 'clcbws/laravel-schema-sentinel',
-            'version' => '2.0.1',
+            'version' => '2.1.0',
             'php_version' => PHP_VERSION,
             'laravel_version' => \Illuminate\Support\Facades\App::version(),
             'os' => PHP_OS_FAMILY,

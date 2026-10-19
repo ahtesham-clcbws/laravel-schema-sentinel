@@ -1,4 +1,4 @@
-# Test Matrix — Laravel Schema Sentinel v2.0.1
+# Test Matrix — Laravel Schema Sentinel v2.1.0
 
 All results documented below reflect real executions against verified environments.
 

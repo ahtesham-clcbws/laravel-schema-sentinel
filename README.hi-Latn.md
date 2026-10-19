@@ -294,7 +294,7 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ## 📄 Changelogs
 
-### Latest Release: v2.0.1 (Stability Patch)
+### Latest Release: v2.1.0 (Stability Patch)
 
 *   **Shadow Migration Isolation**: `ShadowMigrationRunner` ko fully isolate kiya gaya taake global connections par asar na pare.
 *   **Pre-Migration Guard**: Runtime `exit(1)` ko `MigrationBlockedException` se replace kiya gaya aur safe bypass mechanism joda gaya.
