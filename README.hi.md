@@ -294,7 +294,7 @@ composer require clcbws/laravel-schema-sentinel:~1.6.0
 
 ## 📄 परिवर्तन विवरण (Changelogs)
 
-### नवीनतम संस्करण: v2.1.0 (Stability Patch)
+### आगामी संस्करण: v2.1.0 (समीक्षाधीन / Under Final Review)
 
 *   **शैडो माइग्रेशन पृथक्करण**: `ShadowMigrationRunner` को वैश्विक कनेक्शन म्यूटेशन से मुक्त किया गया।
 *   **प्री-माइग्रेशन गार्ड**: रनटाइम `exit(1)` को `MigrationBlockedException` से प्रतिस्थापित कर सुरक्षित बाईपास जोड़ा गया।

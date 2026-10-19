@@ -245,6 +245,42 @@ class ShadowMigrationRunner
                     );
                 }
             }
+
+            // 3. Detect direct PDO instantiations: new PDO(...) or new \PDO(...)
+            $isPdoToken = is_array($t) && (
+                ($t[0] === T_STRING && strtoupper($t[1]) === 'PDO') ||
+                (defined('T_NAME_FULLY_QUALIFIED') && $t[0] === T_NAME_FULLY_QUALIFIED && strtoupper(ltrim($t[1], '\\')) === 'PDO') ||
+                (defined('T_NAME_QUALIFIED') && $t[0] === T_NAME_QUALIFIED && strtoupper(ltrim($t[1], '\\')) === 'PDO')
+            );
+            if ($isPdoToken) {
+                $p = $i - 1;
+                while ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_NS_SEPARATOR])) {
+                    $p--;
+                }
+                if ($p >= 0 && is_array($tokens[$p]) && $tokens[$p][0] === T_NEW) {
+                    throw new RuntimeException(
+                        "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] instantiates a direct PDO object. Direct PDO connections bypass Laravel database management and cannot be safely isolated during shadow simulation."
+                    );
+                }
+            }
+
+            // 4. Detect dangerous external process / shell execution calls
+            if (is_array($t) && $t[0] === T_STRING) {
+                $funcName = strtolower($t[1]);
+                if (in_array($funcName, ['exec', 'shell_exec', 'system', 'passthru', 'proc_open', 'popen'], true)) {
+                    $p = $i - 1;
+                    while ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
+                        $p--;
+                    }
+                    // Ensure it is a standalone function call, not a method invocation like $obj->exec(...)
+                    $isMethod = ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON]));
+                    if (!$isMethod) {
+                        throw new RuntimeException(
+                            "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] invokes external process execution function [{$funcName}()]. External system processes cannot be safely isolated during shadow simulation."
+                        );
+                    }
+                }
+            }
         }
     }
 

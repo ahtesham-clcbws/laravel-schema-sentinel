@@ -12,14 +12,21 @@ This document outlines intentional architectural boundaries, driver discrepancie
   - Client-server shadow connections are inspected against all configured connections (driver, host, port, database, and socket). Any identity match aborts immediately with a `RuntimeException`.
   - Unsafe SQLite URI configurations containing query flags (e.g., `file:... ?mode=...`) are explicitly rejected to prevent URI exploitation.
 
-## 2. Explicit Database Connections in Migrations & Arbitrary PHP Boundary
+## 2. In-Process Execution Model, Security Boundary & Trusted-Migrations Policy
 
-- **Two-Tier Isolation & Cloaking Policy**:
-  - Migrations declaring hardcoded connection calls such as `DB::connection('mysql')`, `Schema::connection('other')`, or model class definitions with `protected $connection = '...'` bypass standard connection redirection.
-  - **Tier 1 (AST Static Validation)**: `ShadowMigrationRunner` scans migration files using AST tokens. Any explicit or dynamic connection override call triggers an immediate `RuntimeException`.
-  - **Tier 2 (Dynamic Runtime Locked Driver Extension)**: Prior to running migrations, all configured non-shadow database connections in the application are purged and re-registered to an inert in-memory SQLite connection powered by a custom locked driver (`sentinel_locked_*`). If any migration code or third-party package attempts to resolve or execute a query on any non-shadow connection (e.g., dynamically or via reflection), the query listener instantly terminates execution with `CRITICAL DATABASE SAFETY VIOLATION` before any packet reaches a live socket.
-- **Enforced Security Boundary for Arbitrary PHP**:
-  - Migrations are executable PHP code. While Sentinel enforces connection cloaking and token validation against Laravel database access, Sentinel does NOT attempt to isolate arbitrary OS-level system calls (`exec`, `shell_exec`, `proc_open`), direct raw `new \PDO()` network connections, or external filesystem mutations. Untrusted migration code requiring full OS-level sandboxing must be executed in isolated containers or dedicated virtual machines. Sentinel fails closed whenever safe execution cannot be established.
+- **Trusted-Migrations-Only Operational Boundary**:
+  - `ShadowMigrationRunner` runs migration simulations inside the host PHP process. **This feature is strictly intended for trusted application migrations.**
+  - **What IS Protected**:
+    - **Default connection redirection**: Default queries are directed to `sentinel_shadow`.
+    - **AST Static Scanner**: Pre-scans migration code for explicit connection invocations (`DB::connection(...)`, `Schema::connection(...)`), model property `$connection` overrides, direct `new \PDO()` instantiations, and external process execution calls (`exec`, `shell_exec`, `system`, `passthru`, `proc_open`, `popen`). These cause an immediate abort (`RuntimeException`).
+    - **Runtime Connection Cloaking**: Temporarily re-registers all non-shadow configured connections to an inert locked SQLite driver (`sentinel_locked_*`) whose queries abort immediately if invoked dynamically or via service container resolution.
+    - **Connection Identity Collisions**: Strictly detects canonical file paths, symlinks, query flags, and matching host/port/database configurations.
+  - **What IS NOT Protected (Host-Process Boundaries)**:
+    - **Arbitrary PHP / External Libraries**: If a migration invokes third-party code that connects to external databases via raw sockets, C extensions, non-standard PDO wrappers outside Laravel, or arbitrary file/network calls, the in-process locked driver cannot sandbox them at the OS kernel level.
+    - **Untrusted Migrations**: Sentinel does NOT provide OS-level containerization or process virtualization. For untrusted third-party migrations, execution must be performed in dedicated throwaway virtual machines or Docker containers with network access disabled.
+- **Connection Purging & Lifecycle Side Effects**:
+  - To implement runtime cloaking, `ShadowMigrationRunner` executes `DB::disconnect()` and `DB::purge()` on all active non-shadow connections before running migrations, and restores the original connection configurations in a `finally` block.
+  - **Side Effect**: Any previously opened PDO connections or in-progress transactions on live connections in the host process are purged. Long-running worker processes or scripts that hold stateful live database transactions must not invoke `Sentinel::diff()` or `schema:drift` concurrently within the same transaction lifecycle.
 
 ## 3. Migration Generator & Reverse Repairs
 
