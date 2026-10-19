@@ -41,9 +41,9 @@ Tests: 27, Assertions: 72, Skipped: 2.
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| PostgreSQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver) |
-| MySQL Integration Test | 1 | 0 | 0 | 1 | **SKIPPED** (Skipped when MySQL driver inactive) |
-| **Total** | **27** | **25** | **0** | **2** | **100% PASS** |
+| PostgreSQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 5 assertions) |
+| MySQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 5 assertions) |
+| **Total** | **27** | **27** | **0** | **0** | **100% PASS** |
 
 ---
 
@@ -87,3 +87,8 @@ Executed in sibling test application (`../schema-sentinel-laravel13-testapp`):
     - Tested against dedicated PostgreSQL databases (`sentinel_pg_test` and `sentinel_pg_shadow`).
     - Verified simulation, schema parsing, and 100% sync on identical schemas.
     - Dropped table on PostgreSQL live DB and confirmed accurate drift detection.
+11. **Cross-Driver Verification (MariaDB 13.0.2 / MySQL)**:
+    - Tested against isolated databases (`sentinel_local_test` and `sentinel_local_shadow`).
+    - Confirmed drift detection on dropped table, automated `--fix` migration generation with `unsigned` integer types and nullable timestamps.
+    - Verified PHP syntax (`php -l`), executed migration cleanly to restore 100% health sync, and verified rollback (`migrate:rollback`).
+    - Both test databases dropped cleanly post-verification.

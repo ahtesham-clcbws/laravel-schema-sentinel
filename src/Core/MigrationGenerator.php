@@ -285,8 +285,15 @@ PHP;
         }
 
         if ($col->default !== null) {
-            $defaultLiteral = var_export($col->default, true);
-            $code .= "->default({$defaultLiteral})";
+            $normalizedDefault = is_string($col->default) ? trim($col->default, "'\" \t\n\r\0\x0B") : $col->default;
+            if (is_string($normalizedDefault) && strtolower($normalizedDefault) === 'null') {
+                if (!$col->nullable) {
+                    $code .= "->nullable()";
+                }
+            } else {
+                $defaultLiteral = var_export($col->default, true);
+                $code .= "->default({$defaultLiteral})";
+            }
         }
 
         if (!empty($col->comment)) {

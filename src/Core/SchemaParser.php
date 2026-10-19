@@ -31,7 +31,23 @@ class SchemaParser
         
         $ignoredTables = \Illuminate\Support\Facades\Config::get('schema-sentinel.ignore_tables', ['migrations']);
 
+        $currentDatabase = $connection->getDatabaseName();
+
+        $driver = $connection->getDriverName();
+
         foreach ($tables as $table) {
+            // In MySQL/Postgres, SchemaBuilder::getTables() returns tables across accessible schemas.
+            // Ensure we only parse tables belonging to the active connection database/schema.
+            $tableSchema = is_array($table) ? ($table['schema'] ?? null) : ($table->schema ?? null);
+            if ($driver === 'mysql' && $tableSchema !== null && $currentDatabase !== null && $tableSchema !== '' && $tableSchema !== $currentDatabase) {
+                continue;
+            } elseif ($driver === 'pgsql' && $tableSchema !== null) {
+                $defaultSchema = $connection->getConfig('schema') ?? 'public';
+                if ($tableSchema !== $defaultSchema) {
+                    continue;
+                }
+            }
+
             // Support both array (Laravel 11/12) and potential objects (Laravel 13+)
             $tableName = is_array($table) ? $table['name'] : $table->name;
             
@@ -44,13 +60,14 @@ class SchemaParser
             $columnDefinitions = [];
             foreach ($columns as $column) {
                 $c = (object) $column; // Cast to object for uniform access
+                $isUnsigned = (isset($c->unsigned) && $c->unsigned) || (isset($c->type) && str_contains(strtolower($c->type), 'unsigned'));
                 $columnDefinitions[$c->name] = new ColumnDefinition(
                     name: $c->name,
                     type: $this->normalizeType($c->type),
-                    nullable: $c->nullable,
+                    nullable: (bool) $c->nullable,
                     default: $c->default,
                     length: $c->length ?? null,
-                    unsigned: $c->unsigned ?? false,
+                    unsigned: $isUnsigned,
                     comment: $c->comment ?? null,
                 );
             }
