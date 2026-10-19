@@ -4,9 +4,9 @@ All results documented below reflect real executions against verified environmen
 
 | Laravel | PHP | Database Engine | Test Type | Result | Notes |
 |---|---|---|---|---|---|
-| **13.15.0** | **8.5.11** | SQLite 3.49.1 (In-Memory) | Package Unit & Feature Tests | **PASS** | 33 tests, 86 assertions, zero failures. |
-| **13.15.0** | **8.5.11** | MariaDB 13.0.2 / MySQL (Local) | Package Integration Test | **PASS** | 1 test, 10 assertions: 12-step lifecycle (create, diff, fix, syntax, apply, verify, rollback, restore). |
-| **13.15.0** | **8.5.11** | PostgreSQL 18.6 (Local) | Package Integration Test | **PASS** | 1 test, 10 assertions: 12-step lifecycle (create, diff, fix, syntax, apply, verify, rollback, restore). |
+| **13.15.0** | **8.5.11** | SQLite 3.49.1 (In-Memory) | Package Unit & Feature Tests | **PASS** | 36 tests, 98 assertions, zero failures. |
+| **13.15.0** | **8.5.11** | MariaDB 13.0.2 / MySQL (Local) | Package Integration Test | **PASS** | 1 test, 18 assertions: 12-step lifecycle + active transaction preservation. |
+| **13.15.0** | **8.5.11** | PostgreSQL 18.6 (Local) | Package Integration Test | **PASS** | 1 test, 18 assertions: 12-step lifecycle + active transaction preservation. |
 | **13.37.0** | **8.5.11** | SQLite 3.49.1 (File & Memory) | Real Test App Lifecycle | **PASS** | Verified `--strict`, `--fix`, `--sql`, `--rollback`, `--snapshot`, reverse engineering, index standardization, and linting. |
 | **13.37.0** | **8.5.11** | MariaDB 13.0.2 / MySQL (Local) | Real Test App Cross-Check | **PASS** | Full lifecycle verified: sync state, drift detection on dropped table, automated fix generation with unsigned and nullable defaults, syntax validation, migration application (100% sync), and rollback. |
 | **13.37.0** | **8.5.11** | PostgreSQL 18.6 (Local) | Real Test App Cross-Check | **PASS** | Successfully verified drift detection, schema parsing, and migration replay against PostgreSQL service with dedicated shadow DB. |

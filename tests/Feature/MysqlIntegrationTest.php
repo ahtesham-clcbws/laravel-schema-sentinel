@@ -100,6 +100,30 @@ class MysqlIntegrationTest extends TestCase
         $this->assertFalse(Schema::hasColumn('my_test_posts', 'views_count'));
         @unlink($tempFile);
 
+        // 5. Active Transaction Safety Verification on MySQL
+        DB::beginTransaction();
+        DB::table('my_test_users')->insert(['email' => 'active_tx_my@example.com', 'is_active' => true]);
+        $this->assertSame(1, DB::transactionLevel());
+
+        $runner = new \Sentinel\SchemaSentinel\Core\ShadowMigrationRunner();
+        $txBlocked = false;
+        try {
+            $runner->run();
+        } catch (\RuntimeException $e) {
+            $txBlocked = true;
+            $this->assertStringContainsString('Active transaction detected on connection', $e->getMessage());
+            $this->assertStringContainsString('mysql', $e->getMessage());
+        }
+        $this->assertTrue($txBlocked, 'Expected Sentinel to block simulation during active MySQL transaction');
+
+        // Confirm active MySQL transaction remains intact
+        $this->assertSame(1, DB::transactionLevel());
+        $this->assertSame(1, DB::table('my_test_users')->where('email', 'active_tx_my@example.com')->count());
+        DB::rollBack();
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertSame(0, DB::table('my_test_users')->where('email', 'active_tx_my@example.com')->count());
+
+        // 6. Cleanup
         Schema::dropIfExists('my_test_posts');
         Schema::dropIfExists('my_test_users');
     }

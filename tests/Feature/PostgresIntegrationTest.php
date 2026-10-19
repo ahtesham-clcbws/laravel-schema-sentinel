@@ -105,7 +105,30 @@ class PostgresIntegrationTest extends TestCase
         $this->assertFalse(Schema::hasColumn('pg_test_posts', 'views_count'));
         @unlink($tempFile);
 
-        // 5. Cleanup
+        // 5. Active Transaction Safety Verification on PostgreSQL
+        DB::beginTransaction();
+        DB::table('pg_test_users')->insert(['email' => 'active_tx_pg@example.com', 'is_active' => true]);
+        $this->assertSame(1, DB::transactionLevel());
+
+        $runner = new \Sentinel\SchemaSentinel\Core\ShadowMigrationRunner();
+        $txBlocked = false;
+        try {
+            $runner->run();
+        } catch (\RuntimeException $e) {
+            $txBlocked = true;
+            $this->assertStringContainsString('Active transaction detected on connection', $e->getMessage());
+            $this->assertStringContainsString('pgsql', $e->getMessage());
+        }
+        $this->assertTrue($txBlocked, 'Expected Sentinel to block simulation during active PostgreSQL transaction');
+
+        // Confirm active PostgreSQL transaction remains intact
+        $this->assertSame(1, DB::transactionLevel());
+        $this->assertSame(1, DB::table('pg_test_users')->where('email', 'active_tx_pg@example.com')->count());
+        DB::rollBack();
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertSame(0, DB::table('pg_test_users')->where('email', 'active_tx_pg@example.com')->count());
+
+        // 6. Cleanup
         Schema::dropIfExists('pg_test_posts');
         Schema::dropIfExists('pg_test_users');
     }

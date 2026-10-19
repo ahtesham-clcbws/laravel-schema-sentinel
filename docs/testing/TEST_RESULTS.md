@@ -20,19 +20,19 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-................SS...............                                 33 / 33 (100%)
+................SS..................                              36 / 36 (100%)
 
-Time: 00:00.773, Memory: 14.00 MB
+Time: 00:00.849, Memory: 14.00 MB
 
 OK, but some tests were skipped!
-Tests: 33, Assertions: 86, Skipped: 2.
+Tests: 36, Assertions: 98, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
 | DiffEngine Analysis | 5 | 5 | 0 | 0 | **PASS** |
-| ShadowMigrationRunner Isolation, Collisions, Cloaking & Interceptors | 9 | 9 | 0 | 0 | **PASS** |
+| ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx Protection) | 12 | 12 | 0 | 0 | **PASS** |
 | MigrationGenerator (Safe Syntax, Escaping, Rollback, Execution) | 4 | 4 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
@@ -41,9 +41,9 @@ Tests: 33, Assertions: 86, Skipped: 2.
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| PostgreSQL Integration Test (12-step lifecycle) | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 10 assertions) |
-| MySQL Integration Test (12-step lifecycle) | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 10 assertions) |
-| **Total** | **33** | **33** | **0** | **0** | **100% PASS** |
+| PostgreSQL Integration Test (12-step lifecycle + Active Tx Interlock) | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 18 assertions) |
+| MySQL Integration Test (12-step lifecycle + Active Tx Interlock) | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 18 assertions) |
+| **Total** | **36** | **36** | **0** | **0** | **100% PASS** |
 
 ---
 
