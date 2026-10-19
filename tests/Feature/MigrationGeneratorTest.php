@@ -115,4 +115,55 @@ class MigrationGeneratorTest extends TestCase
 
         $generator->buildMigrationCode($diff, false);
     }
+
+    public function test_it_executes_and_rolls_back_generated_migration_on_live_database(): void
+    {
+        // 1. Create a base table
+        Schema::create('articles', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+        });
+
+        $this->assertTrue(Schema::hasTable('articles'));
+        $this->assertFalse(Schema::hasColumn('articles', 'summary'));
+
+        // 2. Generate migration code to add 'summary' column
+        $col = new ColumnDefinition('summary', 'string', true, 'default_summary', 255);
+        $diff = new SchemaDiff(
+            missingTables: [],
+            extraTables: [],
+            missingColumns: ['articles.summary' => ['table' => 'articles', 'column' => $col]],
+            extraColumns: [],
+            mismatchedColumns: [],
+            missingIndexes: [],
+            missingForeignKeys: []
+        );
+
+        $generator = new MigrationGenerator();
+        $code = $generator->buildMigrationCode($diff, false);
+
+        // 3. Save to a temporary migration file
+        $tempDir = storage_path('framework/testing/test_exec_mig_' . uniqid());
+        File::ensureDirectoryExists($tempDir);
+        $migrationFile = $tempDir . '/2026_01_01_000000_add_summary_to_articles.php';
+        File::put($migrationFile, $code);
+
+        try {
+            // Instantiate and run up()
+            $migration = require $migrationFile;
+            $migration->up();
+
+            // Verify column exists
+            $this->assertTrue(Schema::hasColumn('articles', 'summary'));
+
+            // Run down()
+            $migration->down();
+
+            // Verify column is removed
+            $this->assertFalse(Schema::hasColumn('articles', 'summary'));
+        } finally {
+            Schema::dropIfExists('articles');
+            File::deleteDirectory($tempDir);
+        }
+    }
 }

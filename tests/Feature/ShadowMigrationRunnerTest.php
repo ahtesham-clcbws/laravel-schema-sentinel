@@ -6,6 +6,7 @@ namespace Sentinel\SchemaSentinel\Tests\Feature;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Sentinel\SchemaSentinel\Core\ShadowMigrationRunner;
 use Sentinel\SchemaSentinel\Tests\TestCase;
 
@@ -110,6 +111,109 @@ class ShadowMigrationRunnerTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Configured migration path does not exist');
+
+        $runner->run();
+    }
+
+    public function test_it_rejects_literal_connection_calls_in_migrations(): void
+    {
+        $tempDir = storage_path('framework/testing/test_literal_conn_' . uniqid());
+        File::ensureDirectoryExists($tempDir);
+        $migrationFile = $tempDir . '/2026_01_01_000000_literal_connection.php';
+        file_put_contents($migrationFile, "<?php
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Support\\Facades\\Schema;
+return new class extends Migration {
+    public function up(): void {
+        Schema::connection('production')->create('leaked_users', function (\$table) { \$table->id(); });
+    }
+};");
+
+        Config::set('schema-sentinel.migration_paths', [$tempDir]);
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage("explicitly invokes connection('production')");
+            $runner->run();
+        } finally {
+            File::deleteDirectory($tempDir);
+        }
+    }
+
+    public function test_it_rejects_dynamic_variable_connection_calls_in_migrations(): void
+    {
+        $tempDir = storage_path('framework/testing/test_dyn_conn_' . uniqid());
+        File::ensureDirectoryExists($tempDir);
+        $migrationFile = $tempDir . '/2026_01_01_000000_dyn_connection.php';
+        file_put_contents($migrationFile, "<?php
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Support\\Facades\\DB;
+return new class extends Migration {
+    public function up(): void {
+        \$target = 'live_db';
+        DB::connection(\$target)->select('SELECT 1');
+    }
+};");
+
+        Config::set('schema-sentinel.migration_paths', [$tempDir]);
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('explicitly invokes connection(dynamic expression)');
+            $runner->run();
+        } finally {
+            File::deleteDirectory($tempDir);
+        }
+    }
+
+    public function test_it_rejects_model_with_connection_property_in_migrations(): void
+    {
+        $tempDir = storage_path('framework/testing/test_model_conn_' . uniqid());
+        File::ensureDirectoryExists($tempDir);
+        $migrationFile = $tempDir . '/2026_01_01_000000_model_connection.php';
+        file_put_contents($migrationFile, "<?php
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Eloquent\\Model;
+class TenantUser extends Model {
+    protected \$connection = 'tenant_mysql';
+}
+return new class extends Migration {
+    public function up(): void {
+        TenantUser::create(['name' => 'admin']);
+    }
+};");
+
+        Config::set('schema-sentinel.migration_paths', [$tempDir]);
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('defines a class property [$connection]');
+            $runner->run();
+        } finally {
+            File::deleteDirectory($tempDir);
+        }
+    }
+
+    public function test_it_detects_collision_via_connection_urls(): void
+    {
+        Config::set('database.connections.live_remote', [
+            'url' => 'mysql://app_user:secret@127.0.0.1:3306/production_corp_db',
+        ]);
+
+        Config::set('schema-sentinel.shadow_connection', [
+            'driver' => 'mysql',
+            'host' => 'localhost',
+            'port' => 3306,
+            'database' => 'production_corp_db',
+        ]);
+
+        $runner = new ShadowMigrationRunner();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("collides with live connection 'live_remote'");
 
         $runner->run();
     }

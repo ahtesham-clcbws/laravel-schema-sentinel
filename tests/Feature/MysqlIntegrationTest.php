@@ -63,6 +63,43 @@ class MysqlIntegrationTest extends TestCase
         $standardized = Sentinel::standardizeIndexes();
         $this->assertIsArray($standardized['deviations']);
 
+        // 12-Step Lifecycle: Introduce drift, fix, migrate, verify, rollback
+        $diffEngine = new \Sentinel\SchemaSentinel\Core\DiffEngine();
+        $diff = $diffEngine->compare([
+            'my_test_posts' => $postTable,
+        ], [
+            'my_test_posts' => new \Sentinel\SchemaSentinel\DTOs\TableDefinition(
+                name: 'my_test_posts',
+                columns: array_merge($postTable->columns, [
+                    'views_count' => new \Sentinel\SchemaSentinel\DTOs\ColumnDefinition('views_count', 'integer', false, 0, null, true),
+                ]),
+                indexes: $postTable->indexes,
+                foreignKeys: $postTable->foreignKeys,
+            ),
+        ]);
+
+        $this->assertNotEmpty($diff->missingColumns);
+
+        $generator = new \Sentinel\SchemaSentinel\Core\MigrationGenerator();
+        $fixCode = $generator->buildMigrationCode($diff, false);
+        $this->assertStringContainsString("\$table->integer('views_count')", $fixCode);
+
+        // Verify PHP Syntax
+        $tempFile = tempnam(sys_get_temp_dir(), 'my_mig_') . '.php';
+        file_put_contents($tempFile, $fixCode);
+        exec("php -l " . escapeshellarg($tempFile), $lOutput, $lExit);
+        $this->assertSame(0, $lExit);
+
+        // Apply generated fix
+        $migration = require $tempFile;
+        $migration->up();
+        $this->assertTrue(Schema::hasColumn('my_test_posts', 'views_count'));
+
+        // Roll back generated fix
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('my_test_posts', 'views_count'));
+        @unlink($tempFile);
+
         Schema::dropIfExists('my_test_posts');
         Schema::dropIfExists('my_test_users');
     }

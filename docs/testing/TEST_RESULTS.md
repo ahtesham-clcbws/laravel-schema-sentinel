@@ -20,20 +20,20 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-...............SS..........                                       27 / 27 (100%)
+................SS..............                                  32 / 32 (100%)
 
-Time: 00:00.914, Memory: 14.00 MB
+Time: 00:00.995, Memory: 14.00 MB
 
 OK, but some tests were skipped!
-Tests: 27, Assertions: 72, Skipped: 2.
+Tests: 32, Assertions: 84, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
 | DiffEngine Analysis | 5 | 5 | 0 | 0 | **PASS** |
-| ShadowMigrationRunner Isolation & Collision Safety | 4 | 4 | 0 | 0 | **PASS** |
-| MigrationGenerator (Safe Syntax, Escaping, Rollback, Unsupported Types) | 3 | 3 | 0 | 0 | **PASS** |
+| ShadowMigrationRunner Isolation, Collisions & Interceptors | 8 | 8 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, Execution) | 4 | 4 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -41,9 +41,9 @@ Tests: 27, Assertions: 72, Skipped: 2.
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| PostgreSQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 5 assertions) |
-| MySQL Integration Test | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 5 assertions) |
-| **Total** | **27** | **27** | **0** | **0** | **100% PASS** |
+| PostgreSQL Integration Test (12-step lifecycle) | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 10 assertions) |
+| MySQL Integration Test (12-step lifecycle) | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 10 assertions) |
+| **Total** | **32** | **32** | **0** | **0** | **100% PASS** |
 
 ---
 

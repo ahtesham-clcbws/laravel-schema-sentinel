@@ -37,6 +37,27 @@ class ShadowMigrationRunner
         try {
             // Guard against recursion while tracking previous bypass state
             $previousBypass = PreMigrationGuard::isBypassed();
+            $attachedInterceptors = [];
+            $interceptorClosure = function ($query, $bindings, $connection) {
+                $name = $connection->getName();
+                if ($name !== self::CONNECTION_NAME) {
+                    throw new RuntimeException(
+                        "CRITICAL DATABASE SAFETY VIOLATION: Migration attempted executing query on live/non-shadow connection ['{$name}'] during shadow simulation! Query: [{$query}]."
+                    );
+                }
+            };
+
+            // Attach runtime safety interceptor to all currently resolved database connections
+            $dbManager = DB::getFacadeRoot();
+            if ($dbManager instanceof \Illuminate\Database\DatabaseManager) {
+                foreach ($dbManager->getConnections() as $name => $activeConn) {
+                    if ($name !== self::CONNECTION_NAME && $activeConn instanceof \Illuminate\Database\Connection) {
+                        $activeConn->beforeExecuting($interceptorClosure);
+                        $attachedInterceptors[$name] = $activeConn;
+                    }
+                }
+            }
+
             PreMigrationGuard::bypass(true);
 
             // Temporarily set default connection to sentinel_shadow to ensure any
@@ -65,6 +86,16 @@ class ShadowMigrationRunner
 
                     $filePath = rtrim($runPath, '/') . '/' . $file;
                     $this->validateMigrationConnectionSafety($filePath);
+
+                    // Re-scan active connections in case new ones were resolved
+                    if ($dbManager instanceof \Illuminate\Database\DatabaseManager) {
+                        foreach ($dbManager->getConnections() as $name => $activeConn) {
+                            if ($name !== self::CONNECTION_NAME && !isset($attachedInterceptors[$name]) && $activeConn instanceof \Illuminate\Database\Connection) {
+                                $activeConn->beforeExecuting($interceptorClosure);
+                                $attachedInterceptors[$name] = $activeConn;
+                            }
+                        }
+                    }
 
                     $start = microtime(true);
 
@@ -111,6 +142,21 @@ class ShadowMigrationRunner
                 }
             }
         } finally {
+            // Detach runtime query interceptors
+            foreach ($attachedInterceptors as $conn) {
+                try {
+                    $ref = new \ReflectionProperty(\Illuminate\Database\Connection::class, 'beforeExecutingCallbacks');
+                    $ref->setAccessible(true);
+                    $cbs = $ref->getValue($conn);
+                    if (is_array($cbs)) {
+                        $cbs = array_values(array_filter($cbs, fn($cb) => $cb !== $interceptorClosure));
+                        $ref->setValue($conn, $cbs);
+                    }
+                } catch (\Throwable) {
+                    // Ignore reflection teardown issues
+                }
+            }
+
             // Restore default connection
             Config::set('database.default', $originalDefault);
             if ($originalDefault) {
@@ -135,7 +181,7 @@ class ShadowMigrationRunner
     }
 
     /**
-     * Inspect migration file source to detect dangerous explicit connection overrides.
+     * Inspect migration file source using AST tokens to detect dangerous explicit connection overrides.
      */
     protected function validateMigrationConnectionSafety(string $filePath): void
     {
@@ -144,15 +190,70 @@ class ShadowMigrationRunner
             return;
         }
 
-        // Detect patterns like DB::connection('mysql') or Schema::connection('production')
-        if (preg_match("/(?:DB|Schema)::connection\(\s*['\"]([^'\"]+)['\"]\s*\)/i", $code, $matches)) {
-            $connName = $matches[1];
-            if ($connName !== self::CONNECTION_NAME) {
-                throw new RuntimeException(
-                    "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] explicitly specifies database connection ['{$connName}']. Shadow simulation cannot safely isolate explicit connection calls without risking mutations to live databases."
-                );
+        $tokens = token_get_all($code);
+        $count = count($tokens);
+
+        for ($i = 0; $i < $count; $i++) {
+            $t = $tokens[$i];
+
+            // 1. Detect calls like DB::connection(...), Schema::connection(...), $schema->connection(...)
+            if (is_array($t) && $t[0] === T_STRING && strtolower($t[1]) === 'connection') {
+                $p = $i - 1;
+                while ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
+                    $p--;
+                }
+                if ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_DOUBLE_COLON, T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR])) {
+                    // Inspect parameter passed inside connection(...)
+                    $argToken = $this->getFirstArgumentToken($tokens, $i + 1, $count);
+                    $literalName = null;
+                    if ($argToken !== null && is_array($argToken) && $argToken[0] === T_CONSTANT_ENCAPSED_STRING) {
+                        $literalName = trim($argToken[1], "'\"");
+                    }
+
+                    if ($literalName !== self::CONNECTION_NAME) {
+                        $desc = $literalName !== null ? "'{$literalName}'" : "dynamic expression";
+                        throw new RuntimeException(
+                            "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] explicitly invokes connection({$desc}). Shadow simulation cannot safely isolate explicit connection calls without risking mutations to live databases."
+                        );
+                    }
+                }
+            }
+
+            // 2. Detect models or classes defining protected/public $connection = '...';
+            if (is_array($t) && $t[0] === T_VARIABLE && $t[1] === '$connection') {
+                $p = $i - 1;
+                while ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
+                    $p--;
+                }
+                if ($p >= 0 && is_array($tokens[$p]) && in_array($tokens[$p][0], [T_PROTECTED, T_PUBLIC, T_PRIVATE, T_VAR])) {
+                    throw new RuntimeException(
+                        "CRITICAL DATABASE SAFETY ERROR: Migration [{$filePath}] defines a class property [\$connection]. Explicit model/class connection overrides cannot be safely redirected during shadow simulation."
+                    );
+                }
             }
         }
+    }
+
+    /**
+     * Find the first non-whitespace/comment token inside parentheses.
+     */
+    protected function getFirstArgumentToken(array $tokens, int $startIndex, int $totalCount): ?array
+    {
+        $openParenFound = false;
+        for ($i = $startIndex; $i < $totalCount; $i++) {
+            $t = $tokens[$i];
+            if ($t === '(') {
+                $openParenFound = true;
+                continue;
+            }
+            if ($openParenFound) {
+                if (is_array($t) && in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])) {
+                    continue;
+                }
+                return is_array($t) ? $t : null;
+            }
+        }
+        return null;
     }
 
     /**
@@ -178,16 +279,17 @@ class ShadowMigrationRunner
      */
     protected function validateShadowSafety(array $shadowConfig): void
     {
-        $driver = $shadowConfig['driver'] ?? 'sqlite';
+        $resolvedShadow = $this->resolveConnectionConfig($shadowConfig);
+        $driver = $resolvedShadow['driver'] ?? 'sqlite';
 
         // Check against ALL configured connections in application
         $configuredConnections = Config::get('database.connections', []);
 
         if ($driver === 'sqlite') {
-            $db = (string) ($shadowConfig['database'] ?? ':memory:');
+            $db = (string) ($resolvedShadow['database'] ?? ':memory:');
 
-            // Reject unsafe SQLite URI configurations (e.g. file:... mode=...)
-            if (str_starts_with($db, 'file:') || str_contains($db, '?')) {
+            // Reject unsafe SQLite URI configurations (e.g. file:... mode=... or query strings)
+            if (str_starts_with($db, 'file:') || str_contains($db, '?') || str_contains($db, '#')) {
                 throw new RuntimeException(
                     "CRITICAL DATABASE SAFETY ERROR: Unsafe SQLite database URI detected in shadow connection [{$db}]. SQLite shadow must use ':memory:' or an explicit filesystem path."
                 );
@@ -204,8 +306,9 @@ class ShadowMigrationRunner
                 if ($name === self::CONNECTION_NAME) {
                     continue;
                 }
-                if (($conn['driver'] ?? '') === 'sqlite') {
-                    $liveDb = (string) ($conn['database'] ?? '');
+                $resolvedLive = $this->resolveConnectionConfig($conn);
+                if (($resolvedLive['driver'] ?? '') === 'sqlite') {
+                    $liveDb = (string) ($resolvedLive['database'] ?? '');
                     if ($liveDb !== '' && $liveDb !== ':memory:') {
                         $liveResolved = $this->resolvePath($liveDb);
                         if ($shadowResolved !== '' && $liveResolved !== '' && $shadowResolved === $liveResolved) {
@@ -221,10 +324,10 @@ class ShadowMigrationRunner
         }
 
         // For client-server DBs (mysql, pgsql, etc.), verify against all live configured connections
-        $shadowHost = strtolower((string) ($shadowConfig['host'] ?? 'localhost'));
-        $shadowPort = (string) ($shadowConfig['port'] ?? ($driver === 'pgsql' ? '5432' : '3306'));
-        $shadowDatabase = (string) ($shadowConfig['database'] ?? '');
-        $shadowSocket = (string) ($shadowConfig['unix_socket'] ?? '');
+        $shadowHost = strtolower((string) ($resolvedShadow['host'] ?? 'localhost'));
+        $shadowPort = (string) ($resolvedShadow['port'] ?? ($driver === 'pgsql' ? '5432' : '3306'));
+        $shadowDatabase = (string) ($resolvedShadow['database'] ?? '');
+        $shadowSocket = (string) ($resolvedShadow['unix_socket'] ?? '');
 
         if ($shadowDatabase === '') {
             throw new RuntimeException("CRITICAL DATABASE SAFETY ERROR: Shadow database name cannot be empty for driver [{$driver}].");
@@ -235,19 +338,21 @@ class ShadowMigrationRunner
                 continue;
             }
 
-            $liveDriver = $conn['driver'] ?? '';
+            $resolvedLive = $this->resolveConnectionConfig($conn);
+            $liveDriver = $resolvedLive['driver'] ?? '';
             if ($liveDriver !== $driver) {
                 continue;
             }
 
-            $liveHost = strtolower((string) ($conn['host'] ?? 'localhost'));
-            $livePort = (string) ($conn['port'] ?? ($liveDriver === 'pgsql' ? '5432' : '3306'));
-            $liveDatabase = (string) ($conn['database'] ?? '');
-            $liveSocket = (string) ($conn['unix_socket'] ?? '');
+            $liveHost = strtolower((string) ($resolvedLive['host'] ?? 'localhost'));
+            $livePort = (string) ($resolvedLive['port'] ?? ($liveDriver === 'pgsql' ? '5432' : '3306'));
+            $liveDatabase = (string) ($resolvedLive['database'] ?? '');
+            $liveSocket = (string) ($resolvedLive['unix_socket'] ?? '');
 
-            // Normalize localhost variants
+            // Normalize localhost representations
+            $localhosts = ['127.0.0.1', 'localhost', '::1', '0.0.0.0'];
             $isSameHost = ($shadowHost === $liveHost) ||
-                (in_array($shadowHost, ['127.0.0.1', 'localhost']) && in_array($liveHost, ['127.0.0.1', 'localhost']));
+                (in_array($shadowHost, $localhosts, true) && in_array($liveHost, $localhosts, true));
 
             $isSamePort = ($shadowPort === $livePort);
             $isSameDb = ($shadowDatabase === $liveDatabase);
@@ -259,6 +364,19 @@ class ShadowMigrationRunner
                 );
             }
         }
+    }
+
+    /**
+     * Resolve connection configuration, parsing connection URLs (e.g. mysql:// or postgres://) if present.
+     */
+    protected function resolveConnectionConfig(array $config): array
+    {
+        if (!empty($config['url'])) {
+            $parser = new \Illuminate\Database\ConfigurationUrlParser();
+            $parsed = $parser->parseConfiguration($config);
+            return array_merge($config, $parsed);
+        }
+        return $config;
     }
 
     /**
