@@ -5,8 +5,8 @@
 - **Repository**: `https://github.com/ahtesham-clcbws/laravel-schema-sentinel`
 - **Branch**: `development`
 - **Starting Baseline Commit**: `210b74a62149b5c249a2bfbb457cb1e5b8716b34`
-- **Certified Final Commit**: `d109713fa6262fe7910ff073e51dff6bf08d519b`
-- **GitHub Actions CI Run**: [CI Tests #40544872369](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions/runs/40544872369) (All 6 matrix jobs PASS 100%)
+- **Certified Final Commit**: `20ba64793fa0965f27e6790c3a274132bb891878`
+- **GitHub Actions CI Run**: [CI Tests #40545200362](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions/runs/40545200362) (All 6 matrix jobs PASS 100% on commit `20ba647`)
 - **Changed Components**:
   - `src/Core/DiffEngine.php`
   - `src/Core/SchemaParser.php`
@@ -45,7 +45,7 @@
 | PHP compatibility | PASS | PHP 8.4 and PHP 8.5 passing in GitHub Actions CI across all three database engines. |
 | Laravel compatibility | PASS | Laravel 13 Blueprint methods (`decimal`, `useCurrent`, `dropForeign`, index decorators) verified without deprecation issues. |
 | Documentation | PASS | `README.md`, `changelogs/v2.2.0.md`, `docs/testing/TEST_MATRIX.md`, `docs/testing/TEST_RESULTS.md`, and `docs/testing/KNOWN_LIMITATIONS.md` updated with exact verified data. |
-| CI | PASS | 6/6 matrix jobs passed in GitHub Actions run #40544872369 on commit `d109713fa6262fe7910ff073e51dff6bf08d519b`. |
+| CI | PASS | 6/6 matrix jobs passed in GitHub Actions run #40545200362 on commit `20ba64793fa0965f27e6790c3a274132bb891878`. |
 
 ---
 

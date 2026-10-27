@@ -4,8 +4,8 @@
 
 - **Date & Time**: 2026-10-27 22:19 UTC+5:30
 - **Target Version**: `2.2.0` (Development)
-- **Tested Commit SHA**: `d109713fa6262fe7910ff073e51dff6bf08d519b`
-- **GitHub Actions CI Run**: [CI Tests #40544872369](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions/runs/40544872369) (All 6 matrix jobs PASS: SQLite, MySQL, and PostgreSQL on PHP 8.4 & 8.5)
+- **Tested Commit SHA**: `20ba64793fa0965f27e6790c3a274132bb891878`
+- **GitHub Actions CI Run**: [CI Tests #40545200362](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions/runs/40545200362) (All 6 matrix jobs PASS: SQLite, MySQL, and PostgreSQL on PHP 8.4 & 8.5)
 - **Laravel Framework Version**: `13.x` (Host App) / `13.15.0` (Package Testbench)
 - **PHP Version**: `PHP 8.5.11 (cli)` / `PHP 8.4` (CI Matrix)
 - **Host System**: Linux (Arch Linux / CachyOS x86_64)
