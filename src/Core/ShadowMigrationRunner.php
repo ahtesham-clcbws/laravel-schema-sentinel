@@ -362,7 +362,12 @@ class ShadowMigrationRunner
             'foreign_key_constraints' => false,
         ]);
 
-        $this->validateShadowSafety($config);
+        try {
+            $this->validateShadowSafety($config);
+        } catch (\Throwable $e) {
+            $this->cleanup();
+            throw $e;
+        }
 
         Config::set('database.connections.' . self::CONNECTION_NAME, $config);
         DB::purge(self::CONNECTION_NAME);

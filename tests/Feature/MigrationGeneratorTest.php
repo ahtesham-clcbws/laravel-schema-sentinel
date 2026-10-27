@@ -221,6 +221,34 @@ class MigrationGeneratorTest extends TestCase
         $this->assertStringContainsString("\$table->decimal('rate', 12, 4);", $code);
     }
 
+    public function test_it_handles_current_timestamp_default_expression(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $col = new ColumnDefinition('created_at', 'timestamp', false, 'CURRENT_TIMESTAMP');
+        $diff = new SchemaDiff(
+            missingColumns: ['posts.created_at' => ['table' => 'posts', 'column' => $col]],
+        );
+
+        $code = $generator->buildMigrationCode($diff, false);
+
+        $this->assertStringContainsString("\$table->timestamp('created_at')->useCurrent();", $code);
+    }
+
+    public function test_it_rejects_unsupported_raw_sql_default_expression(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $col = new ColumnDefinition('uuid', 'uuid', false, 'gen_random_uuid()');
+        $diff = new SchemaDiff(
+            missingColumns: ['items.uuid' => ['table' => 'items', 'column' => $col]],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unsupported raw SQL default expression');
+        $generator->buildMigrationCode($diff, false);
+    }
+
     public function test_it_prevents_duplicate_migration_filenames(): void
     {
         $generator = new MigrationGenerator();

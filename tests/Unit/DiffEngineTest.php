@@ -254,15 +254,70 @@ class DiffEngineTest extends TestCase
         $this->assertArrayHasKey('users.idx_last_first', $diff->missingIndexes);
     }
 
-    public function test_it_normalizes_postgres_and_expression_defaults()
+    public function test_it_correctly_matches_foreign_keys_sharing_local_columns()
     {
         $engine = new DiffEngine();
 
-        $this->assertSame('draft', $engine->normalizeDefault("'draft'::character varying"));
-        $this->assertSame('1', $engine->normalizeDefault("true::boolean"));
-        $this->assertSame('0', $engine->normalizeDefault("false"));
-        $this->assertSame('0', $engine->normalizeDefault("(0)"));
-        $this->assertSame('CURRENT_TIMESTAMP', $engine->normalizeDefault("now()"));
-        $this->assertSame('CURRENT_TIMESTAMP', $engine->normalizeDefault("current_timestamp"));
+        // Suppose a table has two FKs that share local column `target_id` pointing to different tables:
+        // FK1: target_id -> users(id)
+        // FK2: target_id -> audit_logs(id)
+        $live = [
+            'events' => new TableDefinition(
+                'events',
+                ['id' => new ColumnDefinition('id', 'integer', false, null)],
+                [],
+                [
+                    'fk_events_target_users' => new ForeignKeyDefinition('fk_events_target_users', ['target_id'], 'users', ['id'], 'cascade', 'no action'),
+                    'fk_events_target_logs' => new ForeignKeyDefinition('fk_events_target_logs', ['target_id'], 'audit_logs', ['id'], 'no action', 'no action'),
+                ]
+            ),
+        ];
+
+        // Ideal schema has the same two FKs, but fk_events_target_users has changed onDelete to 'set null'
+        $ideal = [
+            'events' => new TableDefinition(
+                'events',
+                ['id' => new ColumnDefinition('id', 'integer', false, null)],
+                [],
+                [
+                    'fk_events_target_users' => new ForeignKeyDefinition('fk_events_target_users', ['target_id'], 'users', ['id'], 'set null', 'no action'),
+                    'fk_events_target_logs' => new ForeignKeyDefinition('fk_events_target_logs', ['target_id'], 'audit_logs', ['id'], 'no action', 'no action'),
+                ]
+            ),
+        ];
+
+        $diff = $engine->compare($live, $ideal);
+
+        $this->assertTrue($diff->hasDifferences());
+        // Only fk_events_target_users should be in changedForeignKeys, NOT target_logs
+        $this->assertArrayHasKey('events.fk_events_target_users', $diff->changedForeignKeys);
+        $this->assertArrayNotHasKey('events.fk_events_target_logs', $diff->changedForeignKeys);
+        $this->assertEmpty($diff->missingForeignKeys);
+    }
+
+    public function test_it_reports_length_diff_when_live_metadata_is_missing_length()
+    {
+        $engine = new DiffEngine();
+
+        // Live column is varchar without length specified (length = null)
+        $live = [
+            'users' => new TableDefinition('users', [
+                'code' => new ColumnDefinition('code', 'varchar', false, null, null),
+            ]),
+        ];
+
+        // Ideal specifies length 50
+        $ideal = [
+            'users' => new TableDefinition('users', [
+                'code' => new ColumnDefinition('code', 'varchar(50)', false, null, 50),
+            ]),
+        ];
+
+        $diff = $engine->compare($live, $ideal);
+
+        $this->assertTrue($diff->hasDifferences());
+        $this->assertArrayHasKey('users.code', $diff->mismatchedColumns);
+        $this->assertNull($diff->mismatchedColumns['users.code']['diffs']['length']['live']);
+        $this->assertSame(50, $diff->mismatchedColumns['users.code']['diffs']['length']['ideal']);
     }
 }

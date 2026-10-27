@@ -93,52 +93,106 @@ class DiffEngine
             }
 
             // 3. Foreign Key Analysis
+            // Index live foreign keys for matching
+            $unmatchedLiveFks = $liveTable->foreignKeys;
+
             foreach ($idealTable->foreignKeys as $idealFkName => $idealFk) {
                 $idealLocalCols = array_values($idealFk->columns);
                 $idealTargetCols = array_values($idealFk->foreignColumns);
+                $idealTargetTable = strtolower($idealFk->foreignTable);
 
-                $matchingFk = null;
-                $hasStructuralMatch = false;
-
-                foreach ($liveTable->foreignKeys as $liveFkName => $liveFk) {
+                // Step 3a: Exact full structural match (same local cols, target table, target cols, actions)
+                $exactMatchKey = null;
+                foreach ($unmatchedLiveFks as $liveKey => $liveFk) {
                     $liveLocalCols = array_values($liveFk->columns);
                     $liveTargetCols = array_values($liveFk->foreignColumns);
+                    $liveTargetTable = strtolower($liveFk->foreignTable);
 
-                    // A structural match occurs if local columns match (or constraint name matches on same local columns)
                     if (
-                        $idealLocalCols === $liveLocalCols ||
-                        (strtolower($idealFkName) === strtolower($liveFkName) && $idealLocalCols === $liveLocalCols)
+                        $idealLocalCols === $liveLocalCols &&
+                        $idealTargetTable === $liveTargetTable &&
+                        $idealTargetCols === $liveTargetCols &&
+                        $this->normalizeFkAction($idealFk->onDelete) === $this->normalizeFkAction($liveFk->onDelete) &&
+                        $this->normalizeFkAction($idealFk->onUpdate) === $this->normalizeFkAction($liveFk->onUpdate)
                     ) {
-                        $hasStructuralMatch = true;
-                        $matchingFk = $liveFk;
-
-                        $diffs = [];
-                        if (strtolower($idealFk->foreignTable) !== strtolower($liveFk->foreignTable)) {
-                            $diffs['foreign_table'] = ['live' => $liveFk->foreignTable, 'ideal' => $idealFk->foreignTable];
-                        }
-                        if ($idealTargetCols !== $liveTargetCols) {
-                            $diffs['foreign_columns'] = ['live' => $liveTargetCols, 'ideal' => $idealTargetCols];
-                        }
-                        if ($this->normalizeFkAction($idealFk->onDelete) !== $this->normalizeFkAction($liveFk->onDelete)) {
-                            $diffs['on_delete'] = ['live' => $liveFk->onDelete, 'ideal' => $idealFk->onDelete];
-                        }
-                        if ($this->normalizeFkAction($idealFk->onUpdate) !== $this->normalizeFkAction($liveFk->onUpdate)) {
-                            $diffs['on_update'] = ['live' => $liveFk->onUpdate, 'ideal' => $idealFk->onUpdate];
-                        }
-
-                        if (!empty($diffs)) {
-                            $changedForeignKeys["$tableName.$idealFkName"] = [
-                                'table' => $tableName,
-                                'live' => $liveFk,
-                                'ideal' => $idealFk,
-                                'diffs' => $diffs,
-                            ];
-                        }
+                        $exactMatchKey = $liveKey;
                         break;
                     }
                 }
 
-                if (!$hasStructuralMatch) {
+                if ($exactMatchKey !== null) {
+                    // Exact match exists in live DB; zero drift for this FK
+                    unset($unmatchedLiveFks[$exactMatchKey]);
+                    continue;
+                }
+
+                // Step 3b: If no exact match, look for a constraint on the same local columns that changed
+                // (Prioritizing matching FK constraint name first, then matching target table)
+                $candidateKey = null;
+
+                // Priority 1: Match by name if it also shares local columns
+                foreach ($unmatchedLiveFks as $liveKey => $liveFk) {
+                    $liveLocalCols = array_values($liveFk->columns);
+                    if (strtolower($idealFkName) === strtolower($liveKey) && $idealLocalCols === $liveLocalCols) {
+                        $candidateKey = $liveKey;
+                        break;
+                    }
+                }
+
+                // Priority 2: Match by local columns AND target table
+                if ($candidateKey === null) {
+                    foreach ($unmatchedLiveFks as $liveKey => $liveFk) {
+                        $liveLocalCols = array_values($liveFk->columns);
+                        $liveTargetTable = strtolower($liveFk->foreignTable);
+                        if ($idealLocalCols === $liveLocalCols && $idealTargetTable === $liveTargetTable) {
+                            $candidateKey = $liveKey;
+                            break;
+                        }
+                    }
+                }
+
+                // Priority 3: Match by local columns only if exactly 1 constraint exists on those local columns
+                if ($candidateKey === null) {
+                    $matchingLocalCandidates = [];
+                    foreach ($unmatchedLiveFks as $liveKey => $liveFk) {
+                        if (array_values($liveFk->columns) === $idealLocalCols) {
+                            $matchingLocalCandidates[$liveKey] = $liveFk;
+                        }
+                    }
+                    if (count($matchingLocalCandidates) === 1) {
+                        $candidateKey = array_key_first($matchingLocalCandidates);
+                    }
+                }
+
+                if ($candidateKey !== null) {
+                    $liveFk = $unmatchedLiveFks[$candidateKey];
+                    unset($unmatchedLiveFks[$candidateKey]);
+
+                    $liveTargetCols = array_values($liveFk->foreignColumns);
+                    $diffs = [];
+
+                    if (strtolower($idealFk->foreignTable) !== strtolower($liveFk->foreignTable)) {
+                        $diffs['foreign_table'] = ['live' => $liveFk->foreignTable, 'ideal' => $idealFk->foreignTable];
+                    }
+                    if ($idealTargetCols !== $liveTargetCols) {
+                        $diffs['foreign_columns'] = ['live' => $liveTargetCols, 'ideal' => $idealTargetCols];
+                    }
+                    if ($this->normalizeFkAction($idealFk->onDelete) !== $this->normalizeFkAction($liveFk->onDelete)) {
+                        $diffs['on_delete'] = ['live' => $liveFk->onDelete, 'ideal' => $idealFk->onDelete];
+                    }
+                    if ($this->normalizeFkAction($idealFk->onUpdate) !== $this->normalizeFkAction($liveFk->onUpdate)) {
+                        $diffs['on_update'] = ['live' => $liveFk->onUpdate, 'ideal' => $idealFk->onUpdate];
+                    }
+
+                    if (!empty($diffs)) {
+                        $changedForeignKeys["$tableName.$idealFkName"] = [
+                            'table' => $tableName,
+                            'live' => $liveFk,
+                            'ideal' => $idealFk,
+                            'diffs' => $diffs,
+                        ];
+                    }
+                } else {
                     $missingForeignKeys["$tableName.$idealFkName"] = ['table' => $tableName, 'fk' => $idealFk];
                 }
             }
@@ -171,13 +225,24 @@ class DiffEngine
         }
 
         // Length comparison for string/char columns
-        // Only compare if both have an explicit length, or if ideal has a length that differs from live length
         if (in_array($idealType, ['string', 'char'], true)) {
             $liveLength = $live->length ?? $this->extractLength($live->type);
             $idealLength = $ideal->length ?? $this->extractLength($ideal->type);
 
-            if ($liveLength !== null && $idealLength !== null && $liveLength !== $idealLength) {
-                $diffs['length'] = ['live' => $liveLength, 'ideal' => $idealLength];
+            // Compare length if both have explicit lengths, or if ideal specifies a length and live length is known
+            // If live database driver cannot represent length (e.g. SQLite returning null for length), avoid false positive
+            // only if live length is genuinely absent and cannot be determined from metadata.
+            if ($liveLength !== null && $idealLength !== null) {
+                if ($liveLength !== $idealLength) {
+                    $diffs['length'] = ['live' => $liveLength, 'ideal' => $idealLength];
+                }
+            } elseif ($idealLength !== null && $liveLength === null) {
+                // If live is string but has no length (e.g. unbounded text/varchar in Postgres/SQLite)
+                // whereas ideal has explicit length (e.g. varchar(100)), report difference if live type is not unbounded by design
+                if (!in_array(strtolower($live->type), ['text', 'longtext', 'mediumtext', 'tinytext'], true)) {
+                    // Check if driver or raw type explicitly has no length
+                    $diffs['length'] = ['live' => null, 'ideal' => $idealLength];
+                }
             }
         }
 
@@ -191,9 +256,14 @@ class DiffEngine
 
             if ($livePrecision !== null && $idealPrecision !== null && $livePrecision !== $idealPrecision) {
                 $diffs['precision'] = ['live' => $livePrecision, 'ideal' => $idealPrecision];
+            } elseif ($idealPrecision !== null && $livePrecision === null) {
+                $diffs['precision'] = ['live' => null, 'ideal' => $idealPrecision];
             }
+
             if ($liveScale !== null && $idealScale !== null && $liveScale !== $idealScale) {
                 $diffs['scale'] = ['live' => $liveScale, 'ideal' => $idealScale];
+            } elseif ($idealScale !== null && $liveScale === null) {
+                $diffs['scale'] = ['live' => null, 'ideal' => $idealScale];
             }
         }
 

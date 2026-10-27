@@ -340,14 +340,38 @@ PHP;
         }
 
         if ($col->default !== null) {
-            $normalizedDefault = is_string($col->default) ? trim($col->default, "'\" \t\n\r\0\x0B") : $col->default;
-            if (is_string($normalizedDefault) && strtolower($normalizedDefault) === 'null') {
-                if (!$col->nullable) {
-                    $code .= "->nullable()";
+            $defaultStr = is_string($col->default) ? trim($col->default) : '';
+
+            // 1. Check for supported SQL timestamp expressions
+            if (is_string($col->default) && preg_match('/^(current_timestamp(\(\))?|now\(\)|localtimestamp)$/i', $defaultStr)) {
+                $code .= "->useCurrent()";
+            } elseif (is_string($col->default) && preg_match('/^([a-z0-9_]+\s*\(.*\)|[a-z0-9_]+::[a-z_]+)$/i', $defaultStr)) {
+                // Check if it's a known non-expression literal like 'draft'::character varying or ('value')
+                $normalizedDefault = trim($col->default, "'\" \t\n\r\0\x0B");
+                if (strtolower($normalizedDefault) === 'null') {
+                    if (!$col->nullable) {
+                        $code .= "->nullable()";
+                    }
+                } elseif (preg_match('/^([a-z_]+)\s*\(/i', $defaultStr) && !in_array(strtolower($defaultStr), ['true', 'false', 'null'])) {
+                    // Raw SQL expression like gen_random_uuid(), custom_seq_next(), etc.
+                    // Fail safely rather than emitting a bogus string literal default
+                    throw new \RuntimeException(
+                        "Unsupported raw SQL default expression [{$defaultStr}] detected on column [{$col->name}]. Manual migration review required."
+                    );
+                } else {
+                    $defaultLiteral = var_export($col->default, true);
+                    $code .= "->default({$defaultLiteral})";
                 }
             } else {
-                $defaultLiteral = var_export($col->default, true);
-                $code .= "->default({$defaultLiteral})";
+                $normalizedDefault = is_string($col->default) ? trim($col->default, "'\" \t\n\r\0\x0B") : $col->default;
+                if (is_string($normalizedDefault) && strtolower($normalizedDefault) === 'null') {
+                    if (!$col->nullable) {
+                        $code .= "->nullable()";
+                    }
+                } else {
+                    $defaultLiteral = var_export($col->default, true);
+                    $code .= "->default({$defaultLiteral})";
+                }
             }
         }
 

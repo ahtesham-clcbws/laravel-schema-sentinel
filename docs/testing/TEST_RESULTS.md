@@ -18,20 +18,20 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-.........................SS..................                     45 / 45 (100%)
+............................SS....................                50 / 50 (100%)
 
-Time: 00:01.222, Memory: 14.00 MB
+Time: 00:00.828, Memory: 16.00 MB
 
 OK, but some tests were skipped!
-Tests: 45, Assertions: 130, Skipped: 2.
+Tests: 50, Assertions: 141, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
-| DiffEngine Analysis (Type, Length, Precision, Order, FKs, Defaults) | 11 | 11 | 0 | 0 | **PASS** |
-| ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx Protection) | 12 | 12 | 0 | 0 | **PASS** |
-| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, Subsecond Uniqueness) | 7 | 7 | 0 | 0 | **PASS** |
+| DiffEngine Analysis (Type, Length, Precision, Order, Disambiguated FKs, Defaults) | 13 | 13 | 0 | 0 | **PASS** |
+| ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx, Setup Failure Recovery) | 13 | 13 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, Timestamp useCurrent, Expression Safety, Subsecond Uniqueness) | 9 | 9 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -41,7 +41,7 @@ Tests: 45, Assertions: 130, Skipped: 2.
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
 | PostgreSQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with pgsql service) |
 | MySQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with mysql service) |
-| **Total** | **45** | **43** | **0** | **2 (driver-specific)** | **100% PASS** |
+| **Total** | **50** | **48** | **0** | **2 (driver-specific)** | **100% PASS** |
 
 ---
 

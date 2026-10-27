@@ -35,6 +35,64 @@ class ShadowMigrationRunnerTest extends TestCase
         $this->assertEquals($originalConnections, Config::get('database.connections'));
     }
 
+    public function test_it_cleans_up_and_restores_on_shadow_safety_validation_failure(): void
+    {
+        $originalDefault = Config::get('database.default');
+        $originalConnections = Config::get('database.connections');
+
+        // Configure an invalid/colliding shadow connection that fails safety checks during setup
+        Config::set('database.connections.live_db', [
+            'driver' => 'sqlite',
+            'database' => storage_path('framework/testing/test_live.sqlite'),
+        ]);
+        Config::set('schema-sentinel.shadow_connection', [
+            'driver' => 'sqlite',
+            'database' => storage_path('framework/testing/test_live.sqlite'),
+        ]);
+
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $runner->run();
+            $this->fail('Expected RuntimeException for colliding shadow connection');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('resolves to the same database file', $e->getMessage());
+        }
+
+        // Verify configuration was restored cleanly and shadow connection was cleaned up
+        $this->assertSame($originalDefault, Config::get('database.default'));
+        $this->assertArrayNotHasKey(ShadowMigrationRunner::CONNECTION_NAME, Config::get('database.connections'));
+    }
+
+    public function test_it_restores_database_configuration_even_on_setup_failure(): void
+    {
+        $originalDefault = Config::get('database.default');
+        $originalConnections = Config::get('database.connections');
+
+        // Configure an invalid/colliding shadow connection that fails safety checks during setup
+        Config::set('database.connections.live_db', [
+            'driver' => 'sqlite',
+            'database' => storage_path('framework/testing/test_live.sqlite'),
+        ]);
+        Config::set('schema-sentinel.shadow_connection', [
+            'driver' => 'sqlite',
+            'database' => storage_path('framework/testing/test_live.sqlite'),
+        ]);
+
+        $runner = new ShadowMigrationRunner();
+
+        try {
+            $runner->run();
+            $this->fail('Expected RuntimeException for colliding shadow connection');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('resolves to the same database file', $e->getMessage());
+        }
+
+        // Verify configuration was restored cleanly
+        $this->assertSame($originalDefault, Config::get('database.default'));
+        $this->assertArrayNotHasKey(ShadowMigrationRunner::CONNECTION_NAME, Config::get('database.connections'));
+    }
+
     public function test_it_rejects_shadow_connection_targeting_live_database(): void
     {
         Config::set('database.default', 'mysql_live');

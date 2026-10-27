@@ -37,8 +37,9 @@ This document outlines intentional architectural boundaries, driver discrepancie
   - Live record export in seeders is removed to prevent sensitive data leakage. Generated seeders contain standard developer placeholder comments.
 - **Foreign Key Re-linking**:
   - In v2.2.0, changed foreign keys are dropped and recreated rather than treated as missing, avoiding duplicate constraint creation errors. Rollback blocks safely restore original constraint definitions.
-- **Unsupported Column Types**:
-  - Repair generation (`--fix` / `--sql`) will not silently coerce unrecognized custom database types to `string()`. If an unsupported type is encountered during drift repair generation, a descriptive `RuntimeException` is raised indicating manual repair is required.
+- **Raw SQL Default Expressions**:
+  - In v2.2.0, standard timestamp defaults (`CURRENT_TIMESTAMP`, `now()`, `localtimestamp`) map directly to Laravel's native `->useCurrent()`.
+  - Non-deterministic or engine-specific raw SQL expressions (such as `gen_random_uuid()` or sequence expressions) are intentionally not converted to arbitrary string literals; Sentinel raises a descriptive `RuntimeException` during migration generation to prevent generating corrupted or invalid schema blueprints.
 
 ## 4. Pre-Migration Guard Context
 
