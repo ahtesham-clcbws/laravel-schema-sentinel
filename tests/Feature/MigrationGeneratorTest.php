@@ -256,12 +256,14 @@ class MigrationGeneratorTest extends TestCase
         $col1 = new ColumnDefinition('status', 'string', false, "'draft'::character varying");
         $col2 = new ColumnDefinition('is_active', 'boolean', false, 'false::boolean');
         $col3 = new ColumnDefinition('retry_count', 'integer', false, '0::smallint');
+        $col4 = new ColumnDefinition('published_at', 'timestamp', false, 'now()::timestamp without time zone');
 
         $diff = new SchemaDiff(
             missingColumns: [
                 'posts.status' => ['table' => 'posts', 'column' => $col1],
                 'posts.is_active' => ['table' => 'posts', 'column' => $col2],
                 'posts.retry_count' => ['table' => 'posts', 'column' => $col3],
+                'posts.published_at' => ['table' => 'posts', 'column' => $col4],
             ]
         );
 
@@ -270,6 +272,21 @@ class MigrationGeneratorTest extends TestCase
         $this->assertStringContainsString("->default('draft')", $code);
         $this->assertStringContainsString("->default(false)", $code);
         $this->assertStringContainsString("->default(0)", $code);
+        $this->assertStringContainsString("\$table->timestamp('published_at')->useCurrent()", $code);
+    }
+
+    public function test_it_rejects_unsupported_postgresql_casted_sql_expressions(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $col = new ColumnDefinition('uuid', 'uuid', false, 'gen_random_uuid()::text');
+        $diff = new SchemaDiff(
+            missingColumns: ['items.uuid' => ['table' => 'items', 'column' => $col]],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unsupported raw SQL default expression');
+        $generator->buildMigrationCode($diff, false);
     }
 
     public function test_it_prevents_duplicate_migration_filenames(): void

@@ -342,33 +342,42 @@ PHP;
         if ($col->default !== null) {
             $defaultStr = is_string($col->default) ? trim($col->default) : '';
 
-            // 1. Check for supported SQL timestamp expressions
-            if (is_string($col->default) && preg_match('/^(current_timestamp(\(\))?|now\(\)|localtimestamp)$/i', $defaultStr)) {
+            // 1. Check for supported SQL timestamp expressions (with or without cast, e.g. now(), now()::timestamp, CURRENT_TIMESTAMP::date)
+            if (is_string($col->default) && preg_match('/^(current_timestamp(\(\))?|now\(\)|localtimestamp)(::[a-z0-9_\s]+)?$/i', $defaultStr)) {
                 $code .= "->useCurrent()";
             } elseif (is_string($col->default) && str_contains($defaultStr, '::')) {
-                // PostgreSQL casted literal defaults like 'draft'::character varying, false::boolean, 0::smallint
-                $uncasted = explode('::', $defaultStr)[0];
-                $uncasted = trim($uncasted);
-                while (
-                    (str_starts_with($uncasted, "'") && str_ends_with($uncasted, "'") && strlen($uncasted) >= 2) ||
-                    (str_starts_with($uncasted, '"') && str_ends_with($uncasted, '"') && strlen($uncasted) >= 2)
-                ) {
-                    $uncasted = substr($uncasted, 1, -1);
+                // PostgreSQL casted expression or literal: e.g. 'draft'::character varying, now()::timestamp, gen_random_uuid()::text
+                $expressionPart = trim(explode('::', $defaultStr)[0]);
+
+                // If the expression part is a SQL function call (e.g. nextval(...), gen_random_uuid(), clock_timestamp())
+                if (preg_match('/^[a-z0-9_]+\s*\(.*\)$/i', $expressionPart)) {
+                    throw new \RuntimeException(
+                        "Unsupported raw SQL default expression [{$defaultStr}] detected on column [{$col->name}]. Manual migration review required."
+                    );
                 }
 
-                if (strtolower($uncasted) === 'null') {
+                // Unquote literal
+                $unquoted = $expressionPart;
+                while (
+                    (str_starts_with($unquoted, "'") && str_ends_with($unquoted, "'") && strlen($unquoted) >= 2) ||
+                    (str_starts_with($unquoted, '"') && str_ends_with($unquoted, '"') && strlen($unquoted) >= 2)
+                ) {
+                    $unquoted = substr($unquoted, 1, -1);
+                }
+
+                if (strtolower($unquoted) === 'null') {
                     if (!$col->nullable) {
                         $code .= "->nullable()";
                     }
-                } elseif (strtolower($uncasted) === 'true') {
+                } elseif (strtolower($unquoted) === 'true') {
                     $code .= "->default(true)";
-                } elseif (strtolower($uncasted) === 'false') {
+                } elseif (strtolower($unquoted) === 'false') {
                     $code .= "->default(false)";
-                } elseif (is_numeric($uncasted)) {
-                    $numVal = str_contains($uncasted, '.') ? (float) $uncasted : (int) $uncasted;
+                } elseif (is_numeric($unquoted)) {
+                    $numVal = str_contains($unquoted, '.') ? (float) $unquoted : (int) $unquoted;
                     $code .= "->default({$numVal})";
                 } else {
-                    $defaultLiteral = var_export($uncasted, true);
+                    $defaultLiteral = var_export($unquoted, true);
                     $code .= "->default({$defaultLiteral})";
                 }
             } elseif (is_string($col->default) && preg_match('/^[a-z0-9_]+\s*\(.*\)$/i', $defaultStr)) {

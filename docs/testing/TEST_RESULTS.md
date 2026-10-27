@@ -18,12 +18,12 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-..............................SS....................              52 / 52 (100%)
+...............................SS....................             53 / 53 (100%)
 
-Time: 00:00.949, Memory: 16.00 MB
+Time: 00:00.895, Memory: 16.00 MB
 
 OK, but some tests were skipped!
-Tests: 52, Assertions: 146, Skipped: 2.
+Tests: 53, Assertions: 149, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
@@ -31,7 +31,7 @@ Tests: 52, Assertions: 146, Skipped: 2.
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
 | DiffEngine Analysis (Type, Length, Precision, Order, Disambiguated FKs, Specialized Indexes, Defaults) | 14 | 14 | 0 | 0 | **PASS** |
 | ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx, Pre-Setup State Recovery) | 13 | 13 | 0 | 0 | **PASS** |
-| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, PG Casts, Timestamp useCurrent, Expression Safety, Subsecond Uniqueness) | 10 | 10 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, PG Casts/Expressions, Timestamp useCurrent, Expression Safety, Subsecond Uniqueness) | 11 | 11 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -41,7 +41,7 @@ Tests: 52, Assertions: 146, Skipped: 2.
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
 | PostgreSQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with pgsql service, includes changed FK up/down) |
 | MySQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with mysql service, includes changed FK up/down) |
-| **Total** | **52** | **50** | **0** | **2 (driver-specific)** | **100% PASS** |
+| **Total** | **53** | **51** | **0** | **2 (driver-specific)** | **100% PASS** |
 
 ---
 
