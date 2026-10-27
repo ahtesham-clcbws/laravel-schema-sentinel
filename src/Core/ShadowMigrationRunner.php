@@ -29,22 +29,25 @@ class ShadowMigrationRunner
     public function run(?string $tag = null, bool $testRollback = false): Connection
     {
         $this->migrationTimes = [];
-        $this->setupShadowConnection();
 
+        // Capture original configurations and pre-execution state before any mutation
         $originalDefault = Config::get('database.default');
-        $createdPaths = [];
-
         $originalConnectionsConfig = Config::get('database.connections', []);
-        $lockedDriver = 'sentinel_locked_' . uniqid();
+        $originalShadowConfig = $originalConnectionsConfig[self::CONNECTION_NAME] ?? null;
+        $originalShadowExisted = array_key_exists(self::CONNECTION_NAME, $originalConnectionsConfig);
+        $previousBypass = PreMigrationGuard::isBypassed();
 
-        // Ensure no active database transaction exists on any open connection in the host process.
-        // Disconnecting or purging live connections during an active transaction would silently abort or corrupt
-        // that transaction state. In-process shadow simulation cannot run concurrently with an uncommitted transaction.
-        $this->ensureNoActiveTransactions();
+        $createdPaths = [];
+        $lockedDriver = 'sentinel_locked_' . uniqid();
+        $isSuccess = false;
 
         try {
-            // Guard against recursion while tracking previous bypass state
-            $previousBypass = PreMigrationGuard::isBypassed();
+            $this->setupShadowConnection();
+
+            // Ensure no active database transaction exists on any open connection in the host process.
+            // Disconnecting or purging live connections during an active transaction would silently abort or corrupt
+            // that transaction state. In-process shadow simulation cannot run concurrently with an uncommitted transaction.
+            $this->ensureNoActiveTransactions();
 
             // Register a custom locked driver with Laravel's DatabaseManager.
             // Any attempt to resolve any non-shadow connection (directly, indirectly, or dynamically)
@@ -85,6 +88,8 @@ class ShadowMigrationRunner
                     ];
                 }
             }
+            // Ensure sentinel_shadow is preserved in the cloaked config
+            $cloakedConnections[self::CONNECTION_NAME] = Config::get('database.connections.' . self::CONNECTION_NAME);
             Config::set('database.connections', $cloakedConnections);
 
             PreMigrationGuard::bypass(true);
@@ -160,18 +165,40 @@ class ShadowMigrationRunner
                     }
                 }
             }
-        } finally {
-            // Restore original connections configuration cleanly without reflection hacks
-            Config::set('database.connections', $originalConnectionsConfig);
 
-            // Purge any temporary dummy connections created during migration execution
-            foreach (array_keys($originalConnectionsConfig) as $connName) {
-                if ($connName !== self::CONNECTION_NAME) {
+            $isSuccess = true;
+        } finally {
+            // Restore live connections configuration
+            $restoredConnections = $originalConnectionsConfig;
+            if ($isSuccess) {
+                // Keep sentinel_shadow alive for the caller until explicitly cleaned up
+                $restoredConnections[self::CONNECTION_NAME] = Config::get('database.connections.' . self::CONNECTION_NAME);
+            } else {
+                // If execution failed, restore original shadow connection state
+                if ($originalShadowExisted) {
+                    $restoredConnections[self::CONNECTION_NAME] = $originalShadowConfig;
+                } else {
+                    unset($restoredConnections[self::CONNECTION_NAME]);
                     try {
-                        DB::disconnect($connName);
-                        DB::purge($connName);
+                        DB::disconnect(self::CONNECTION_NAME);
+                        DB::purge(self::CONNECTION_NAME);
                     } catch (\Throwable) {
-                        // Ignore purge errors during teardown
+                        // Ignore disconnect errors
+                    }
+                }
+            }
+            Config::set('database.connections', $restoredConnections);
+
+            // Purge dummy connections ONLY if cloaking was executed
+            if ($isSuccess || !empty($createdPaths)) {
+                foreach (array_keys($originalConnectionsConfig) as $connName) {
+                    if ($connName !== self::CONNECTION_NAME) {
+                        try {
+                            DB::disconnect($connName);
+                            DB::purge($connName);
+                        } catch (\Throwable) {
+                            // Ignore purge errors during teardown
+                        }
                     }
                 }
             }
@@ -187,8 +214,8 @@ class ShadowMigrationRunner
                 $this->cleanupTemporaryPath($tempDir);
             }
 
-            // Restore previous bypass state instead of blindly setting false
-            PreMigrationGuard::bypass($previousBypass ?? false);
+            // Restore previous bypass state
+            PreMigrationGuard::bypass($previousBypass);
         }
 
         return DB::connection(self::CONNECTION_NAME);

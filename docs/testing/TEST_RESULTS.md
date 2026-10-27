@@ -18,20 +18,20 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-............................SS....................                50 / 50 (100%)
+..............................SS....................              52 / 52 (100%)
 
-Time: 00:00.828, Memory: 16.00 MB
+Time: 00:00.949, Memory: 16.00 MB
 
 OK, but some tests were skipped!
-Tests: 50, Assertions: 141, Skipped: 2.
+Tests: 52, Assertions: 146, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
-| DiffEngine Analysis (Type, Length, Precision, Order, Disambiguated FKs, Defaults) | 13 | 13 | 0 | 0 | **PASS** |
-| ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx, Setup Failure Recovery) | 13 | 13 | 0 | 0 | **PASS** |
-| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, Timestamp useCurrent, Expression Safety, Subsecond Uniqueness) | 9 | 9 | 0 | 0 | **PASS** |
+| DiffEngine Analysis (Type, Length, Precision, Order, Disambiguated FKs, Specialized Indexes, Defaults) | 14 | 14 | 0 | 0 | **PASS** |
+| ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx, Pre-Setup State Recovery) | 13 | 13 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, PG Casts, Timestamp useCurrent, Expression Safety, Subsecond Uniqueness) | 10 | 10 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -39,9 +39,9 @@ Tests: 50, Assertions: 141, Skipped: 2.
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| PostgreSQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with pgsql service) |
-| MySQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with mysql service) |
-| **Total** | **50** | **48** | **0** | **2 (driver-specific)** | **100% PASS** |
+| PostgreSQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with pgsql service, includes changed FK up/down) |
+| MySQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with mysql service, includes changed FK up/down) |
+| **Total** | **52** | **50** | **0** | **2 (driver-specific)** | **100% PASS** |
 
 ---
 

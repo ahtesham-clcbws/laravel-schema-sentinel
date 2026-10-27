@@ -249,6 +249,29 @@ class MigrationGeneratorTest extends TestCase
         $generator->buildMigrationCode($diff, false);
     }
 
+    public function test_it_handles_postgresql_casted_literal_defaults_correctly(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $col1 = new ColumnDefinition('status', 'string', false, "'draft'::character varying");
+        $col2 = new ColumnDefinition('is_active', 'boolean', false, 'false::boolean');
+        $col3 = new ColumnDefinition('retry_count', 'integer', false, '0::smallint');
+
+        $diff = new SchemaDiff(
+            missingColumns: [
+                'posts.status' => ['table' => 'posts', 'column' => $col1],
+                'posts.is_active' => ['table' => 'posts', 'column' => $col2],
+                'posts.retry_count' => ['table' => 'posts', 'column' => $col3],
+            ]
+        );
+
+        $code = $generator->buildMigrationCode($diff, false);
+
+        $this->assertStringContainsString("->default('draft')", $code);
+        $this->assertStringContainsString("->default(false)", $code);
+        $this->assertStringContainsString("->default(0)", $code);
+    }
+
     public function test_it_prevents_duplicate_migration_filenames(): void
     {
         $generator = new MigrationGenerator();

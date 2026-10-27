@@ -345,23 +345,37 @@ PHP;
             // 1. Check for supported SQL timestamp expressions
             if (is_string($col->default) && preg_match('/^(current_timestamp(\(\))?|now\(\)|localtimestamp)$/i', $defaultStr)) {
                 $code .= "->useCurrent()";
-            } elseif (is_string($col->default) && preg_match('/^([a-z0-9_]+\s*\(.*\)|[a-z0-9_]+::[a-z_]+)$/i', $defaultStr)) {
-                // Check if it's a known non-expression literal like 'draft'::character varying or ('value')
-                $normalizedDefault = trim($col->default, "'\" \t\n\r\0\x0B");
-                if (strtolower($normalizedDefault) === 'null') {
+            } elseif (is_string($col->default) && str_contains($defaultStr, '::')) {
+                // PostgreSQL casted literal defaults like 'draft'::character varying, false::boolean, 0::smallint
+                $uncasted = explode('::', $defaultStr)[0];
+                $uncasted = trim($uncasted);
+                while (
+                    (str_starts_with($uncasted, "'") && str_ends_with($uncasted, "'") && strlen($uncasted) >= 2) ||
+                    (str_starts_with($uncasted, '"') && str_ends_with($uncasted, '"') && strlen($uncasted) >= 2)
+                ) {
+                    $uncasted = substr($uncasted, 1, -1);
+                }
+
+                if (strtolower($uncasted) === 'null') {
                     if (!$col->nullable) {
                         $code .= "->nullable()";
                     }
-                } elseif (preg_match('/^([a-z_]+)\s*\(/i', $defaultStr) && !in_array(strtolower($defaultStr), ['true', 'false', 'null'])) {
-                    // Raw SQL expression like gen_random_uuid(), custom_seq_next(), etc.
-                    // Fail safely rather than emitting a bogus string literal default
-                    throw new \RuntimeException(
-                        "Unsupported raw SQL default expression [{$defaultStr}] detected on column [{$col->name}]. Manual migration review required."
-                    );
+                } elseif (strtolower($uncasted) === 'true') {
+                    $code .= "->default(true)";
+                } elseif (strtolower($uncasted) === 'false') {
+                    $code .= "->default(false)";
+                } elseif (is_numeric($uncasted)) {
+                    $numVal = str_contains($uncasted, '.') ? (float) $uncasted : (int) $uncasted;
+                    $code .= "->default({$numVal})";
                 } else {
-                    $defaultLiteral = var_export($col->default, true);
+                    $defaultLiteral = var_export($uncasted, true);
                     $code .= "->default({$defaultLiteral})";
                 }
+            } elseif (is_string($col->default) && preg_match('/^[a-z0-9_]+\s*\(.*\)$/i', $defaultStr)) {
+                // Raw SQL function call like gen_random_uuid(), uuid_generate_v4(), nextval(...)
+                throw new \RuntimeException(
+                    "Unsupported raw SQL default expression [{$defaultStr}] detected on column [{$col->name}]. Manual migration review required."
+                );
             } else {
                 $normalizedDefault = is_string($col->default) ? trim($col->default, "'\" \t\n\r\0\x0B") : $col->default;
                 if (is_string($normalizedDefault) && strtolower($normalizedDefault) === 'null') {

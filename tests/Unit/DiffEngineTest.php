@@ -295,18 +295,42 @@ class DiffEngineTest extends TestCase
         $this->assertEmpty($diff->missingForeignKeys);
     }
 
+    public function test_it_detects_specialized_index_type_differences()
+    {
+        $engine = new DiffEngine();
+
+        $live = [
+            'articles' => new TableDefinition(
+                'articles',
+                ['title' => new ColumnDefinition('title', 'varchar', false, null)],
+                ['idx_title' => new IndexDefinition('idx_title', 'index', ['title'])]
+            ),
+        ];
+
+        $ideal = [
+            'articles' => new TableDefinition(
+                'articles',
+                ['title' => new ColumnDefinition('title', 'varchar', false, null)],
+                ['idx_title' => new IndexDefinition('idx_title', 'fulltext', ['title'])]
+            ),
+        ];
+
+        $diff = $engine->compare($live, $ideal);
+
+        $this->assertTrue($diff->hasDifferences());
+        $this->assertArrayHasKey('articles.idx_title', $diff->missingIndexes);
+    }
+
     public function test_it_reports_length_diff_when_live_metadata_is_missing_length()
     {
         $engine = new DiffEngine();
 
-        // Live column is varchar without length specified (length = null)
         $live = [
             'users' => new TableDefinition('users', [
                 'code' => new ColumnDefinition('code', 'varchar', false, null, null),
             ]),
         ];
 
-        // Ideal specifies length 50
         $ideal = [
             'users' => new TableDefinition('users', [
                 'code' => new ColumnDefinition('code', 'varchar(50)', false, null, 50),

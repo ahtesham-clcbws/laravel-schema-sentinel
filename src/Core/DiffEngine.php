@@ -355,10 +355,13 @@ class DiffEngine
 
     protected function normalizeIndexType(string $type): string
     {
-        $type = strtolower($type);
+        $type = strtolower(trim($type));
         return match ($type) {
             'primary', 'primary key' => 'primary',
             'unique' => 'unique',
+            'fulltext' => 'fulltext',
+            'spatial' => 'spatial',
+            'spatialindex', 'spatial index' => 'spatial',
             default => 'index',
         };
     }

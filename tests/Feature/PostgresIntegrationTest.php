@@ -105,6 +105,52 @@ class PostgresIntegrationTest extends TestCase
         $this->assertFalse(Schema::hasColumn('pg_test_posts', 'views_count'));
         @unlink($tempFile);
 
+        // 4b. Changed Foreign-Key Migration Up/Down Verification on PostgreSQL
+        $liveFk = $postTable->foreignKeys[array_key_first($postTable->foreignKeys)];
+        $idealFk = new \Sentinel\SchemaSentinel\DTOs\ForeignKeyDefinition(
+            name: $liveFk->name,
+            columns: $liveFk->columns,
+            foreignTable: $liveFk->foreignTable,
+            foreignColumns: $liveFk->foreignColumns,
+            onDelete: 'restrict',
+            onUpdate: 'cascade'
+        );
+
+        $fkDiff = $diffEngine->compare([
+            'pg_test_posts' => $postTable,
+        ], [
+            'pg_test_posts' => new \Sentinel\SchemaSentinel\DTOs\TableDefinition(
+                name: 'pg_test_posts',
+                columns: $postTable->columns,
+                indexes: $postTable->indexes,
+                foreignKeys: [$idealFk->name => $idealFk],
+            ),
+        ]);
+
+        $this->assertArrayHasKey('pg_test_posts.' . $idealFk->name, $fkDiff->changedForeignKeys);
+
+        $fkFixCode = $generator->buildMigrationCode($fkDiff, false);
+        $fkTempFile = tempnam(sys_get_temp_dir(), 'pg_fk_mig_') . '.php';
+        file_put_contents($fkTempFile, $fkFixCode);
+        $fkMigration = require $fkTempFile;
+
+        // Apply changed FK (up)
+        $fkMigration->up();
+        $recheckSchema = Sentinel::parse();
+        $recheckPostTable = $recheckSchema['pg_test_posts'];
+        $recheckFk = $recheckPostTable->foreignKeys[$idealFk->name] ?? null;
+        $this->assertNotNull($recheckFk);
+        $this->assertSame('restrict', $recheckFk->onDelete);
+
+        // Roll back changed FK (down)
+        $fkMigration->down();
+        $rollbackSchema = Sentinel::parse();
+        $rollbackPostTable = $rollbackSchema['pg_test_posts'];
+        $rollbackFk = $rollbackPostTable->foreignKeys[$liveFk->name] ?? null;
+        $this->assertNotNull($rollbackFk);
+        $this->assertSame('cascade', $rollbackFk->onDelete);
+        @unlink($fkTempFile);
+
         // 5. Active Transaction Safety Verification on PostgreSQL
         DB::beginTransaction();
         DB::table('pg_test_users')->insert(['email' => 'active_tx_pg@example.com', 'is_active' => true]);
