@@ -14,6 +14,7 @@ readonly class SchemaDiff
      * @param array<string, array{table: string, live: ColumnDefinition, ideal: ColumnDefinition, diffs: array}> $mismatchedColumns
      * @param array<string, array{table: string, index: IndexDefinition}> $missingIndexes
      * @param array<string, array{table: string, fk: ForeignKeyDefinition}> $missingForeignKeys
+     * @param array<string, array{table: string, live: ForeignKeyDefinition, ideal: ForeignKeyDefinition, diffs: array}> $changedForeignKeys
      */
     public function __construct(
         public array $missingTables = [],
@@ -23,6 +24,7 @@ readonly class SchemaDiff
         public array $mismatchedColumns = [],
         public array $missingIndexes = [],
         public array $missingForeignKeys = [],
+        public array $changedForeignKeys = [],
     ) {}
 
     public function hasDifferences(): bool
@@ -33,7 +35,8 @@ readonly class SchemaDiff
                !empty($this->extraColumns) || 
                !empty($this->mismatchedColumns) ||
                !empty($this->missingIndexes) ||
-               !empty($this->missingForeignKeys);
+               !empty($this->missingForeignKeys) ||
+               !empty($this->changedForeignKeys);
     }
 
     /**
@@ -54,6 +57,7 @@ readonly class SchemaDiff
         $score -= count($this->missingColumns) * 5;
         $score -= count($this->mismatchedColumns) * 5;
         $score -= count($this->missingForeignKeys) * 5;
+        $score -= count($this->changedForeignKeys) * 5;
 
         // Minor issues
         $score -= count($this->missingIndexes) * 2;

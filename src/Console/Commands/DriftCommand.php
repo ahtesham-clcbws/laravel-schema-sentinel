@@ -280,6 +280,21 @@ Options:
                 $this->line("  <fg=red>•</> <fg=cyan>{$data['table']}</>->({$cols}) references <fg=cyan>{$data['fk']->foreignTable}</>({$fCols})");
             }
         }
+
+        // Changed Foreign Keys
+        if (!empty($diff->changedForeignKeys)) {
+            $this->newLine();
+            $this->components->error('Changed Foreign Keys in Live DB:');
+            foreach ($diff->changedForeignKeys as $data) {
+                $cols = implode(', ', $data['ideal']->columns);
+                $this->line("  <fg=red>•</> <fg=cyan>{$data['table']}</>->({$cols}) [{$data['ideal']->name}]");
+                foreach ($data['diffs'] as $attr => $val) {
+                    $liveVal = is_array($val['live']) ? implode(',', $val['live']) : (string) $val['live'];
+                    $idealVal = is_array($val['ideal']) ? implode(',', $val['ideal']) : (string) $val['ideal'];
+                    $this->line("    <fg=gray>-</> $attr: <fg=red>Live [{$liveVal}]</> vs <fg=green>Ideal [{$idealVal}]</>");
+                }
+            }
+        }
         
     }
 

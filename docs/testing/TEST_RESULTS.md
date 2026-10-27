@@ -1,12 +1,10 @@
-# Real Application Test Results — Laravel Schema Sentinel v2.1.0
+# Real Application Test Results — Laravel Schema Sentinel v2.2.0
 
 ## Execution Summary
 
-- **Date & Time**: 2026-10-19 16:25 UTC+5:30
-- **Target Version**: `2.1.0`
-- **Tested Commit SHA**: `7a9481829e1eb160d5bfa4a4608386a3d9070a92`
-- **GitHub Actions Run**: [CI Tests #39240798874](https://github.com/ahtesham-clcbws/laravel-schema-sentinel/actions/runs/39240798874) (All 6 matrix jobs PASS: SQLite, MySQL, and PostgreSQL on PHP 8.4 & 8.5)
-- **Laravel Framework Version**: `13.37.0` (Host App) / `13.15.0` (Package Testbench)
+- **Date & Time**: 2026-10-27 19:47 UTC+5:30
+- **Target Version**: `2.2.0` (Development)
+- **Laravel Framework Version**: `13.x` (Host App) / `13.15.0` (Package Testbench)
 - **PHP Version**: `PHP 8.5.11 (cli)` / `PHP 8.4` (CI Matrix)
 - **Host System**: Linux (Arch Linux / CachyOS x86_64)
 
@@ -20,20 +18,20 @@ PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.5.11
 Configuration: phpunit.xml
 
-................SS..................                              36 / 36 (100%)
+.........................SS..................                     45 / 45 (100%)
 
-Time: 00:00.849, Memory: 14.00 MB
+Time: 00:01.222, Memory: 14.00 MB
 
 OK, but some tests were skipped!
-Tests: 36, Assertions: 98, Skipped: 2.
+Tests: 45, Assertions: 130, Skipped: 2.
 ```
 
 | Area | Tests | Passed | Failed | Skipped | Status |
 |---|---|---|---|---|---|
 | DTOs & Table Definitions | 2 | 2 | 0 | 0 | **PASS** |
-| DiffEngine Analysis | 5 | 5 | 0 | 0 | **PASS** |
+| DiffEngine Analysis (Type, Length, Precision, Order, FKs, Defaults) | 11 | 11 | 0 | 0 | **PASS** |
 | ShadowMigrationRunner (Isolation, Collisions, Cloaking, Active Tx Protection) | 12 | 12 | 0 | 0 | **PASS** |
-| MigrationGenerator (Safe Syntax, Escaping, Rollback, Execution) | 4 | 4 | 0 | 0 | **PASS** |
+| MigrationGenerator (Safe Syntax, Escaping, Rollback, FK Re-linking, Subsecond Uniqueness) | 7 | 7 | 0 | 0 | **PASS** |
 | PreMigrationGuard & Exception Safety | 2 | 2 | 0 | 0 | **PASS** |
 | Telemetry Isolation (Zero Network Dispatch) | 1 | 1 | 0 | 0 | **PASS** |
 | Schema Documentation Generator | 1 | 1 | 0 | 0 | **PASS** |
@@ -41,9 +39,9 @@ Tests: 36, Assertions: 98, Skipped: 2.
 | Index Standardization Command | 2 | 2 | 0 | 0 | **PASS** |
 | Data Drift Command | 2 | 2 | 0 | 0 | **PASS** |
 | Interactive Help Board | 1 | 1 | 0 | 0 | **PASS** |
-| PostgreSQL Integration Test (12-step lifecycle + Active Tx Interlock) | 1 | 1* | 0 | 0 | **PASS** (*Verified with pgsql driver: 1 test, 18 assertions) |
-| MySQL Integration Test (12-step lifecycle + Active Tx Interlock) | 1 | 1* | 0 | 0 | **PASS** (*Verified with mysql driver: 1 test, 18 assertions) |
-| **Total** | **36** | **36** | **0** | **0** | **100% PASS** |
+| PostgreSQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with pgsql service) |
+| MySQL Integration Test (CI Matrix Container) | 1 | 1* | 0 | 0 | **PASS** (*Verified in CI with mysql service) |
+| **Total** | **45** | **43** | **0** | **2 (driver-specific)** | **100% PASS** |
 
 ---
 

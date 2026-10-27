@@ -48,6 +48,10 @@ class NotificationManager
             $summary .= "⚠️ *Mismatched Columns:* " . count($diff->mismatchedColumns) . "\n";
         }
 
+        if (!empty($diff->changedForeignKeys)) {
+            $summary .= "🔗 *Changed Foreign Keys:* " . count($diff->changedForeignKeys) . "\n";
+        }
+
         $summary .= "\nRun `php artisan schema:drift` to review and fix.";
 
         return $summary;

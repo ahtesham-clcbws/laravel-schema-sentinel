@@ -19,7 +19,7 @@ class Telemetry
     {
         return [
             'package_name' => 'clcbws/laravel-schema-sentinel',
-            'version' => '2.1.0',
+            'version' => '2.2.0',
             'php_version' => PHP_VERSION,
             'laravel_version' => \Illuminate\Support\Facades\App::version(),
             'os' => PHP_OS_FAMILY,

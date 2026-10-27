@@ -61,14 +61,33 @@ class SchemaParser
             foreach ($columns as $column) {
                 $c = (object) $column; // Cast to object for uniform access
                 $isUnsigned = (isset($c->unsigned) && $c->unsigned) || (isset($c->type) && str_contains(strtolower($c->type), 'unsigned'));
+                
+                $length = $c->length ?? null;
+                $precision = $c->precision ?? null;
+                $scale = $c->scale ?? null;
+                $typeStr = (string) ($c->type ?? '');
+
+                // Parse precision/scale from type string if not directly provided (e.g., "decimal(10,2)" or "numeric(8,4)")
+                if (($precision === null || $scale === null) && preg_match('/(?:decimal|numeric)\s*\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\)/i', $typeStr, $matches)) {
+                    $precision = (int) $matches[1];
+                    $scale = isset($matches[2]) ? (int) $matches[2] : 0;
+                }
+
+                // Parse length from type string if not provided (e.g., "varchar(100)")
+                if ($length === null && preg_match('/(?:varchar|char|nvarchar|character varying)\s*\(\s*(\d+)\s*\)/i', $typeStr, $matches)) {
+                    $length = (int) $matches[1];
+                }
+
                 $columnDefinitions[$c->name] = new ColumnDefinition(
                     name: $c->name,
-                    type: $this->normalizeType($c->type),
+                    type: $this->normalizeType($typeStr),
                     nullable: (bool) $c->nullable,
                     default: $c->default,
-                    length: $c->length ?? null,
+                    length: $length !== null ? (int) $length : null,
                     unsigned: $isUnsigned,
                     comment: $c->comment ?? null,
+                    precision: $precision !== null ? (int) $precision : null,
+                    scale: $scale !== null ? (int) $scale : null,
                 );
             }
 

@@ -166,4 +166,74 @@ class MigrationGeneratorTest extends TestCase
             File::deleteDirectory($tempDir);
         }
     }
+
+    public function test_it_generates_replacement_for_changed_foreign_keys_with_safe_rollback(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $liveFk = new ForeignKeyDefinition('posts_user_fk', ['user_id'], 'users', ['id'], 'no action', 'no action');
+        $idealFk = new ForeignKeyDefinition('posts_user_fk', ['user_id'], 'users', ['id'], 'cascade', 'no action');
+
+        $diff = new SchemaDiff(
+            missingTables: [],
+            extraTables: [],
+            missingColumns: [],
+            extraColumns: [],
+            mismatchedColumns: [],
+            missingIndexes: [],
+            missingForeignKeys: [],
+            changedForeignKeys: [
+                'posts.posts_user_fk' => [
+                    'table' => 'posts',
+                    'live' => $liveFk,
+                    'ideal' => $idealFk,
+                    'diffs' => ['on_delete' => ['live' => 'no action', 'ideal' => 'cascade']],
+                ]
+            ]
+        );
+
+        $code = $generator->buildMigrationCode($diff, false);
+
+        $this->assertStringContainsString("\$table->dropForeign('posts_user_fk');", $code);
+        $this->assertStringContainsString("->onDelete('cascade')", $code);
+
+        // Verify valid PHP syntax
+        $tempFile = tempnam(sys_get_temp_dir(), 'fk_mig_') . '.php';
+        File::put($tempFile, $code);
+        $output = [];
+        $returnVar = 0;
+        exec("php -l " . escapeshellarg($tempFile), $output, $returnVar);
+        unlink($tempFile);
+        $this->assertSame(0, $returnVar);
+    }
+
+    public function test_it_preserves_decimal_precision_and_scale_in_blueprint(): void
+    {
+        $generator = new MigrationGenerator();
+
+        $col = new ColumnDefinition('rate', 'decimal', false, null, null, false, null, 12, 4);
+        $diff = new SchemaDiff(
+            missingColumns: ['rates.rate' => ['table' => 'rates', 'column' => $col]],
+        );
+
+        $code = $generator->buildMigrationCode($diff, false);
+
+        $this->assertStringContainsString("\$table->decimal('rate', 12, 4);", $code);
+    }
+
+    public function test_it_prevents_duplicate_migration_filenames(): void
+    {
+        $generator = new MigrationGenerator();
+        $diff = new SchemaDiff();
+
+        $path1 = $generator->generate($diff, false);
+        $path2 = $generator->generate($diff, false);
+
+        $this->assertNotSame($path1, $path2);
+        $this->assertFileExists($path1);
+        $this->assertFileExists($path2);
+
+        @unlink($path1);
+        @unlink($path2);
+    }
 }

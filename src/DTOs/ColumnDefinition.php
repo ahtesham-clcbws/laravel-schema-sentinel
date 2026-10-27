@@ -16,6 +16,8 @@ readonly class ColumnDefinition
     public ?int $length;
     public bool $unsigned;
     public ?string $comment;
+    public ?int $precision;
+    public ?int $scale;
 
     /**
      * @param string $name
@@ -25,6 +27,8 @@ readonly class ColumnDefinition
      * @param int|null $length
      * @param bool $unsigned
      * @param string|null $comment
+     * @param int|null $precision
+     * @param int|null $scale
      */
     public function __construct(
         string $name,
@@ -33,7 +37,9 @@ readonly class ColumnDefinition
         mixed $default,
         ?int $length = null,
         bool $unsigned = false,
-        ?string $comment = null
+        ?string $comment = null,
+        ?int $precision = null,
+        ?int $scale = null
     ) {
         $this->name = $name;
         $this->type = $type;
@@ -42,6 +48,8 @@ readonly class ColumnDefinition
         $this->length = $length;
         $this->unsigned = $unsigned;
         $this->comment = $comment;
+        $this->precision = $precision;
+        $this->scale = $scale;
     }
 
     /**
@@ -57,6 +65,8 @@ readonly class ColumnDefinition
             'length' => $this->length,
             'unsigned' => $this->unsigned,
             'comment' => $this->comment,
+            'precision' => $this->precision,
+            'scale' => $this->scale,
         ];
     }
 }

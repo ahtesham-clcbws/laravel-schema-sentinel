@@ -1,4 +1,4 @@
-# Known Limitations & Engine Constraints — Laravel Schema Sentinel v2.1.0
+# Known Limitations & Engine Constraints — Laravel Schema Sentinel v2.2.0
 
 This document outlines intentional architectural boundaries, driver discrepancies, and unsupported scenarios.
 
@@ -34,13 +34,15 @@ This document outlines intentional architectural boundaries, driver discrepancie
 - **Enum Reflection**:
   - Pure SQLite does not enforce native ENUM types; column types are stored as `varchar` or `text`. Reverse engineering generates class scaffolds without fabricating imaginary business states.
 - **Data Seeder Sanitization**:
-  - In v2.1.0, automated live record export in seeders has been removed to prevent sensitive data leakage. Generated seeders contain standard developer placeholder comments.
+  - Live record export in seeders is removed to prevent sensitive data leakage. Generated seeders contain standard developer placeholder comments.
+- **Foreign Key Re-linking**:
+  - In v2.2.0, changed foreign keys are dropped and recreated rather than treated as missing, avoiding duplicate constraint creation errors. Rollback blocks safely restore original constraint definitions.
 - **Unsupported Column Types**:
   - Repair generation (`--fix` / `--sql`) will not silently coerce unrecognized custom database types to `string()`. If an unsupported type is encountered during drift repair generation, a descriptive `RuntimeException` is raised indicating manual repair is required.
 
 ## 4. Pre-Migration Guard Context
 
 - **Event Exception Behavior**:
-  - In previous versions, `PreMigrationGuard` invoked `exit(1)` abruptly. In v2.1.0, it throws `Sentinel\SchemaSentinel\Exceptions\MigrationBlockedException`, allowing host testing runners or CLI handlers to trap and report the event cleanly.
+  - `PreMigrationGuard` throws `Sentinel\SchemaSentinel\Exceptions\MigrationBlockedException`, allowing host testing runners or CLI handlers to trap and report the event cleanly.
 - **Re-entrancy & Internal Command Bypass**:
   - The guard safely tracks nested bypass states and automatically ignores Sentinel internal artisan calls (`schema:*`, `vendor:publish`), eliminating command deadlocks.

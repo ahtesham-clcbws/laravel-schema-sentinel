@@ -1,0 +1,21 @@
+# Backlog - v2.2.0 Implementation
+
+- [x] Phase 1: Schema Comparison Accuracy (`DiffEngine.php`, `SchemaParser.php`, DTOs)
+  - Column properties: length, precision/scale, unsigned, nullability, default values
+  - Type normalization (tinyint vs boolean, varchar length, driver equivalents)
+  - Default value normalization (Postgres casts, booleans, SQL expressions)
+  - Index comparison (order, column composition, primary/unique/index)
+  - Foreign key comparison (changed vs missing, actions on delete/update)
+- [x] Phase 2: Migration Generation Reliability (`MigrationGenerator.php`)
+  - Missing/modified columns, indexes, foreign keys
+  - Drop & recreate changed foreign keys safely in up/down
+  - Prevent duplicate filename collisions (subsecond unique timestamps)
+  - Valid Laravel 13 Blueprint syntax
+- [x] Phase 3: Shadow Migration Safety (`ShadowMigrationRunner.php`)
+  - Exception and cleanup hardening (setup, migration, rollback)
+  - Strict live connection prevention and configuration restoration
+- [x] Phase 4: Migration Guard & DX (`PreMigrationGuard.php`, commands)
+  - Proper exit codes, bypass state restoration, non-destructive `--sql`
+- [x] Phase 5: Test Suite & Regression Coverage
+- [x] Phase 6: Final Validation Suite
+- [x] Phase 7: Documentation, Changelogs & Final Commit/Push

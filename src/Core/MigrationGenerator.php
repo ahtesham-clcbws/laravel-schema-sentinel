@@ -25,9 +25,20 @@ class MigrationGenerator
      */
     public function generate(SchemaDiff $diff, bool $interactive = false): string
     {
-        $name = 'fix_schema_drift_' . date('Y_m_d_His');
+        // Prevent filename collision even when multiple migrations are generated within the same second
+        $micro = sprintf("%06d", (int) (microtime(true) * 1000000) % 1000000);
+        $name = 'fix_schema_drift_' . date('Y_m_d_His') . '_' . $micro;
         $fileName = date('Y_m_d_His') . '_' . $name . '.php';
         $path = App::databasePath('migrations/' . $fileName);
+
+        // Ensure collision safety if file already exists
+        $counter = 1;
+        while (File::exists($path)) {
+            $name = 'fix_schema_drift_' . date('Y_m_d_His') . '_' . $micro . '_' . $counter;
+            $fileName = date('Y_m_d_His') . '_' . $name . '.php';
+            $path = App::databasePath('migrations/' . $fileName);
+            $counter++;
+        }
 
         $content = $this->buildMigrationCode($diff, $interactive);
 
@@ -109,8 +120,19 @@ class MigrationGenerator
             $up[] = $this->buildAddForeignKeysCode($tableName, $fks);
             foreach ($fks as $fk) {
                 $fkNameLiteral = var_export($fk['fk']->name, true);
-                $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) { \$table->dropForeign({$fkNameLiteral}); });";
+                $down[] = "Schema::table({$tableLiteral}, function (Blueprint \$table) {\n            \$table->dropForeign({$fkNameLiteral});\n        });";
             }
+        }
+
+        // 6. Changed Foreign Keys Logic (Drop and Recreate safely)
+        $groupedChangedFks = $this->groupByTable($diff->changedForeignKeys ?? []);
+        foreach ($groupedChangedFks as $tableName => $items) {
+            if ($interactive && !$command->confirm("Update altered foreign keys on table [$tableName]?", true)) {
+                continue;
+            }
+            $tableLiteral = var_export($tableName, true);
+            $up[] = $this->buildReplaceForeignKeysCode($tableName, $items, 'ideal');
+            $down[] = $this->buildReplaceForeignKeysCode($tableName, $items, 'live');
         }
 
         $upContent = implode("\n\n        ", $up);
@@ -265,6 +287,36 @@ PHP;
         return implode("\n", $lines);
     }
 
+    protected function buildReplaceForeignKeysCode(string $tableName, array $items, string $targetState): string
+    {
+        $tableLiteral = var_export($tableName, true);
+        $lines = ["Schema::table({$tableLiteral}, function (Blueprint \$table) {"];
+        
+        // 1. Drop the constraint from the opposing state first
+        $opposingState = ($targetState === 'ideal') ? 'live' : 'ideal';
+        foreach ($items as $item) {
+            $opposingFk = $item[$opposingState];
+            $dropNameLiteral = var_export($opposingFk->name, true);
+            $lines[] = "            \$table->dropForeign({$dropNameLiteral});";
+        }
+
+        // 2. Add the target constraint
+        foreach ($items as $item) {
+            $fk = $item[$targetState];
+            $colsLiteral = var_export($fk->columns, true);
+            $fColsLiteral = var_export($fk->foreignColumns, true);
+            $nameLiteral = var_export($fk->name, true);
+            $fTableLiteral = var_export($fk->foreignTable, true);
+            $onDeleteLiteral = var_export($fk->onDelete, true);
+            $onUpdateLiteral = var_export($fk->onUpdate, true);
+
+            $lines[] = "            \$table->foreign({$colsLiteral}, {$nameLiteral})\n                  ->references({$fColsLiteral})->on({$fTableLiteral})\n                  ->onDelete({$onDeleteLiteral})->onUpdate({$onUpdateLiteral});";
+        }
+
+        $lines[] = "        });";
+        return implode("\n", $lines);
+    }
+
     protected function columnToBlueprint($col): string
     {
         $method = $this->mapTypeToMethod($col->type);
@@ -272,11 +324,14 @@ PHP;
 
         if ($col->length !== null && in_array($method, ['string', 'char'])) {
             $code = "\$table->{$method}({$nameLiteral}, {$col->length})";
+        } elseif ($method === 'decimal' && $col->precision !== null) {
+            $scale = $col->scale ?? 0;
+            $code = "\$table->decimal({$nameLiteral}, {$col->precision}, {$scale})";
         } else {
             $code = "\$table->{$method}({$nameLiteral})";
         }
 
-        if ($col->unsigned && in_array($method, ['integer', 'bigInteger', 'smallInteger', 'tinyInteger', 'mediumInteger'])) {
+        if ($col->unsigned && in_array($method, ['integer', 'bigInteger', 'smallInteger', 'tinyInteger', 'mediumInteger', 'decimal', 'float', 'double'])) {
             $code .= "->unsigned()";
         }
 
@@ -309,6 +364,11 @@ PHP;
         $rawType = trim($type);
         $type = strtolower($rawType);
 
+        // Check for tinyint(1)
+        if (preg_match('/^tinyint\s*\(\s*1\s*\)$/i', $type)) {
+            return 'boolean';
+        }
+
         // Strip length/precision if present
         if (preg_match('/^([a-z_]+)\s*\(/i', $type, $matches)) {
             $type = $matches[1];
@@ -325,10 +385,11 @@ PHP;
             'bigint', 'int8', 'bigserial' => 'bigInteger',
             'smallint', 'int2' => 'smallInteger',
             'mediumint' => 'mediumInteger',
+            'tinyint' => 'tinyInteger',
             'string', 'varchar', 'character varying', 'nvarchar' => 'string',
             'char' => 'char',
             'text', 'longtext', 'mediumtext', 'tinytext' => 'text',
-            'boolean', 'bool', 'tinyint' => 'boolean',
+            'boolean', 'bool' => 'boolean',
             'timestamp', 'timestamptz' => 'timestamp',
             'datetime', 'datetime2' => 'dateTime',
             'date' => 'date',
