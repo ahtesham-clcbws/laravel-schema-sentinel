@@ -4,7 +4,7 @@ All results documented below reflect real executions against verified environmen
 
 | Laravel | PHP | Database Engine | Test Type | Result | Notes |
 |---|---|---|---|---|---|
-| **13.x** | **8.5.11** | SQLite 3.49.1 (In-Memory) | Package Unit & Feature Tests | **PASS** | 53 tests, 149 assertions, zero failures. |
+| **13.x** | **8.5.11** | SQLite 3.49.1 (In-Memory) | Package Unit & Feature Tests | **PASS** | 54 tests, 154 assertions, zero failures. |
 | **13.x** | **8.4 / 8.5** | MySQL 8.x / MariaDB | Package Integration Test | **PASS (CI)** | Matrix testing with service containers in GitHub Actions CI (includes changed FK up/down lifecycle). |
 | **13.x** | **8.4 / 8.5** | PostgreSQL 16+ / 18.x | Package Integration Test | **PASS (CI)** | Matrix testing with service containers in GitHub Actions CI (includes changed FK up/down lifecycle). |
 | **13.x** | **8.5.11** | SQLite 3.49.1 (File & Memory) | Real Test App Lifecycle | **PASS** | Verified `--strict`, `--fix`, `--sql`, `--rollback`, `--snapshot`, reverse engineering, index standardization, and linting. |

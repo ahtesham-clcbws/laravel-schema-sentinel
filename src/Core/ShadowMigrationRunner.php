@@ -40,6 +40,7 @@ class ShadowMigrationRunner
         $createdPaths = [];
         $lockedDriver = 'sentinel_locked_' . uniqid();
         $isSuccess = false;
+        $cloakingOccurred = false;
 
         try {
             $this->setupShadowConnection();
@@ -91,6 +92,7 @@ class ShadowMigrationRunner
             // Ensure sentinel_shadow is preserved in the cloaked config
             $cloakedConnections[self::CONNECTION_NAME] = Config::get('database.connections.' . self::CONNECTION_NAME);
             Config::set('database.connections', $cloakedConnections);
+            $cloakingOccurred = true;
 
             PreMigrationGuard::bypass(true);
 
@@ -189,8 +191,8 @@ class ShadowMigrationRunner
             }
             Config::set('database.connections', $restoredConnections);
 
-            // Purge dummy connections ONLY if cloaking was executed
-            if ($isSuccess || !empty($createdPaths)) {
+            // Purge dummy connections whenever cloaking occurred, regardless of success or failure
+            if ($cloakingOccurred) {
                 foreach (array_keys($originalConnectionsConfig) as $connName) {
                     if ($connName !== self::CONNECTION_NAME) {
                         try {

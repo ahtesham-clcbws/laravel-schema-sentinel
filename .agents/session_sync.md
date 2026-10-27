@@ -2,12 +2,12 @@
 
 ## Active State
 - Branch: `development`
-- Target: v2.2.0 Release Closure
-- Status: Release closure checks completed. 53 tests passing (149 assertions), 0 failures.
+- Target: v2.2.0 Final Closure
+- Status: All final checks and cloaking lifecycle guarantees verified. 54 tests passing (154 assertions), 0 failures.
 
 ## Handoff Summary
-- PostgreSQL cast handling refined: distinguished literal casts from SQL expression casts.
-- Protected `now()::timestamp` and `CURRENT_TIMESTAMP::date` with `->useCurrent()`, rejected raw expression casts (`gen_random_uuid()::text`) with descriptive exceptions.
-- Added focused regression tests in `MigrationGeneratorTest`.
-- Synchronized documentation, test matrix, and results.
-- Ready for final commit and push to `development`.
+- ShadowMigrationRunner: Tracked whether cloaking actually occurred; purged locked connections across any early exit after cloaking; added regression test in `ShadowMigrationRunnerTest`.
+- MigrationGenerator: Preserved timestamp defaults (`useCurrent()`), unwrapped literal PG casts, safely rejected expression casts (`now()::timestamp`, `gen_random_uuid()::text`).
+- DiffEngine: Preserved specialized index types and multi-constraint FK disambiguation.
+- Synchronized documentation, test matrix, and fresh test execution evidence.
+- Committed and pushed to `development`.

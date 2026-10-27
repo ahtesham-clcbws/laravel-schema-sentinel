@@ -399,4 +399,34 @@ return new class extends Migration {
         // Cleanup
         $conn->statement('DROP TABLE test_tx_preservation');
     }
+
+    public function test_it_purges_cloaked_connections_and_restores_state_on_failure_immediately_after_cloaking(): void
+    {
+        $originalDefault = Config::get('database.default');
+        $originalConnections = Config::get('database.connections');
+
+        // Configure an invalid migration path so failure triggers immediately after cloaking,
+        // before any temporary directory creation or migration execution
+        Config::set('schema-sentinel.migration_paths', ['/path/to/non_existent_sentinel_dir_' . uniqid()]);
+
+        $runner = new ShadowMigrationRunner();
+
+        $exceptionCaught = false;
+        try {
+            $runner->run();
+        } catch (\RuntimeException $e) {
+            $exceptionCaught = true;
+            $this->assertStringContainsString('Configured migration path does not exist', $e->getMessage());
+        }
+
+        $this->assertTrue($exceptionCaught);
+
+        // Verify all configurations and live connection settings were completely restored
+        $this->assertSame($originalDefault, Config::get('database.default'));
+        $this->assertEquals($originalConnections, Config::get('database.connections'));
+
+        // Verify live connections are usable and not stuck in a cloaked or locked driver state
+        $conn = DB::connection();
+        $this->assertNotSame('sentinel_locked_', substr($conn->getConfig('driver') ?? '', 0, 16));
+    }
 }
